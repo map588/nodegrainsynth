@@ -1005,6 +1005,7 @@ export const App: React.FC = () => {
                             min={0} max={1}
                             step={0.01}
                             colors={colors}
+                            defaultValue={0.5}
                         />
                         <Knob
                             label="Return"
@@ -1016,6 +1017,7 @@ export const App: React.FC = () => {
                             min={0} max={1}
                             step={0.01}
                             colors={colors}
+                            defaultValue={0.5}
                         />
                     </div>
                 </div>
@@ -1042,6 +1044,7 @@ export const App: React.FC = () => {
                             onToggleTarget={() => toggleLfoTarget('position')}
                             colors={colors}
                             disabled={isFrozen}
+                            defaultValue={DEFAULT_PARAMS.position}
                         />
                         <Knob
                             label="Spray"
@@ -1054,6 +1057,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('spread')}
                             onToggleTarget={() => toggleLfoTarget('spread')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.spread}
                         />
                             <Knob
                             label="Size"
@@ -1066,6 +1070,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('grainSize')}
                             onToggleTarget={() => toggleLfoTarget('grainSize')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.grainSize}
                         />
                         <Knob
                             label="Density"
@@ -1078,6 +1083,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('density')}
                             onToggleTarget={() => toggleLfoTarget('density')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.density}
                         />
                         <Knob
                             label="Pan"
@@ -1089,6 +1095,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('pan')}
                             onToggleTarget={() => toggleLfoTarget('pan')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.pan}
                         />
                          <Knob
                             label="Pan Spr"
@@ -1101,6 +1108,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('panSpread')}
                             onToggleTarget={() => toggleLfoTarget('panSpread')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.panSpread}
                         />
                     </div>
                 </div>
@@ -1134,6 +1142,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('pitch')}
                             onToggleTarget={() => toggleLfoTarget('pitch')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.pitch}
                         />
                         {isHarmonicLockEnabled && (
                             <span className="text-[9px] font-mono text-green-400 mt-1">
@@ -1157,6 +1166,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('fmFreq')}
                             onToggleTarget={() => toggleLfoTarget('fmFreq')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.fmFreq}
                         />
                         <Knob
                             label="FM Amt"
@@ -1169,6 +1179,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('fmAmount')}
                             onToggleTarget={() => toggleLfoTarget('fmAmount')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.fmAmount}
                         />
                         </div>
 
@@ -1229,6 +1240,7 @@ export const App: React.FC = () => {
                                 isTargeted={params.lfoTargets.includes('attack')}
                                 onToggleTarget={() => toggleLfoTarget('attack')}
                                 colors={colors}
+                                defaultValue={DEFAULT_PARAMS.attack}
                             />
                             <Knob
                                 label="Release"
@@ -1240,6 +1252,7 @@ export const App: React.FC = () => {
                                 isTargeted={params.lfoTargets.includes('release')}
                                 onToggleTarget={() => toggleLfoTarget('release')}
                                 colors={colors}
+                                defaultValue={DEFAULT_PARAMS.release}
                             />
                             </div>
                             {/* Curve Selector */}
@@ -1278,6 +1291,7 @@ export const App: React.FC = () => {
                                 {...createKnobHandlers('lfoRate')}
                                 unit="Hz"
                                 colors={colors}
+                                defaultValue={DEFAULT_PARAMS.lfoRate}
                             />
                             <Knob
                                 label="Depth"
@@ -1286,6 +1300,7 @@ export const App: React.FC = () => {
                                 {...createKnobHandlers('lfoAmount')}
                                 unit="%"
                                 colors={colors}
+                                defaultValue={DEFAULT_PARAMS.lfoAmount}
                             />
                         </div>
                         
@@ -1366,6 +1381,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('filterFreq')}
                             onToggleTarget={() => toggleLfoTarget('filterFreq')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.filterFreq}
                         />
                         <Knob
                             label="Res"
@@ -1378,6 +1394,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('filterRes')}
                             onToggleTarget={() => toggleLfoTarget('filterRes')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.filterRes}
                         />
                         <Knob
                             label="Drive"
@@ -1390,6 +1407,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('distAmount')}
                             onToggleTarget={() => toggleLfoTarget('distAmount')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.distAmount}
                         />
 
                         {/* Row 2: Delay */}
@@ -1404,6 +1422,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('delayTime')}
                             onToggleTarget={() => toggleLfoTarget('delayTime')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.delayTime}
                         />
                         <Knob
                             label="Dly Fdbk"
@@ -1416,6 +1435,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('delayFeedback')}
                             onToggleTarget={() => toggleLfoTarget('delayFeedback')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.delayFeedback}
                         />
                          <Knob
                             label="Dly Mix"
@@ -1428,6 +1448,7 @@ export const App: React.FC = () => {
                             isTargeted={params.lfoTargets.includes('delayMix')}
                             onToggleTarget={() => toggleLfoTarget('delayMix')}
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.delayMix}
                         />
 
                         {/* Row 3: Reverb & Master */}
@@ -1438,6 +1459,7 @@ export const App: React.FC = () => {
                             {...createKnobHandlers('reverbDecay')}
                             unit="s"
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.reverbDecay}
                         />
                         <Knob
                             label="Rev Mix"
@@ -1446,6 +1468,7 @@ export const App: React.FC = () => {
                             {...createKnobHandlers('reverbMix')}
                             unit="%"
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.reverbMix}
                         />
                         <Knob
                             label="Volume"
@@ -1454,6 +1477,7 @@ export const App: React.FC = () => {
                             {...createKnobHandlers('volume')}
                             unit="dB"
                             colors={colors}
+                            defaultValue={DEFAULT_PARAMS.volume}
                         />
                     </div>
                 </div>

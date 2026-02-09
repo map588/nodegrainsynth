@@ -18,6 +18,7 @@ interface KnobProps {
   onToggleTarget?: () => void;
   colors: ThemeColors;
   disabled?: boolean;
+  defaultValue?: number;
 }
 
 export const Knob: React.FC<KnobProps> = ({
@@ -36,7 +37,8 @@ export const Knob: React.FC<KnobProps> = ({
   isTargeted = false,
   onToggleTarget,
   colors,
-  disabled = false
+  disabled = false,
+  defaultValue
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [internalValue, setInternalValue] = useState(value);
@@ -61,6 +63,12 @@ export const Knob: React.FC<KnobProps> = ({
     startVal.current = internalValue;
     document.body.style.cursor = 'ns-resize';
     onDragStart?.();
+  };
+
+  const handleDoubleClick = () => {
+    if (disabled || !defaultValue) return;
+    setInternalValue(defaultValue);
+    onChange(defaultValue);
   };
 
   useEffect(() => {
@@ -131,6 +139,7 @@ export const Knob: React.FC<KnobProps> = ({
       <div
         className={`relative w-12 h-12 ${disabled ? 'cursor-not-allowed' : mappingCursor} group`}
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
         style={{ userSelect: 'none' }}
       >
         <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
@@ -179,7 +188,7 @@ export const Knob: React.FC<KnobProps> = ({
             style={{ backgroundColor: colors.knobValueBg, color: colors.knobValueText ? undefined : '#fb923c', userSelect: 'none' }}
         >
           <span className={colors.knobValueText}>{displayValue}</span>
-          {unit && <span className="text-[9px] ml-[1px] opacity-60">{unit}</span>}
+          {unit && <span className={`text-[10px] ml-[1px] opacity-90 ${colors.knobValueText}`}>{unit}</span>}
         </div>
       </div>
     </div>
