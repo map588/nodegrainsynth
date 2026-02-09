@@ -314,8 +314,10 @@ export const App: React.FC = () => {
 
   const handleSpectralFreezeToggle = () => {
       if (!engineRef.current) return;
-      engineRef.current.toggleSpectralFreeze();
-      setIsSpectralFreeze(engineRef.current.isSpectralFreezeActive());
+      const newState = !params.spectralFreeze;
+      setParams({ ...params, spectralFreeze: newState });
+      engineRef.current.updateParams({ ...params, spectralFreeze: newState });
+      setIsSpectralFreeze(newState);
   };
 
   const handleDriftToggle = () => {
