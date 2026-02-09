@@ -9,6 +9,7 @@ interface KnobProps {
   onChange: (val: number) => void;
   onDragStart?: () => void;
   onDragEnd?: (finalValue: number) => void;
+  onReset?: () => void;
   unit?: string;
   step?: number;
   integer?: boolean;
@@ -29,6 +30,7 @@ export const Knob: React.FC<KnobProps> = ({
   onChange,
   onDragStart,
   onDragEnd,
+  onReset,
   unit = '',
   step = 0.01,
   integer = false,
@@ -66,7 +68,12 @@ export const Knob: React.FC<KnobProps> = ({
   };
 
   const handleDoubleClick = () => {
-    if (disabled || !defaultValue) return;
+    if (disabled) return;
+    if (onReset) {
+      onReset();
+      return;
+    }
+    if (!defaultValue) return;
     setInternalValue(defaultValue);
     onChange(defaultValue);
     onDragEnd?.(defaultValue);

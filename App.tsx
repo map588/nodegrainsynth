@@ -249,6 +249,11 @@ export const App: React.FC = () => {
     handleParamChange('pitch', lockedPitch);
   };
 
+  // Reset pitch directly to default (bypasses harmonic lock snap)
+  const handlePitchReset = () => {
+    handleParamChange('pitch', DEFAULT_PARAMS.pitch);
+  };
+
   const togglePlay = async () => {
     if (!engineRef.current) return;
 
@@ -1137,6 +1142,7 @@ export const App: React.FC = () => {
                                 const finalParams = { ...params, pitch: val };
                                 handleKnobDragEnd(finalParams);
                             }}
+                            onReset={handlePitchReset}
                             unit="st"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('pitch')}
