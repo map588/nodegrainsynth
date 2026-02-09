@@ -45,15 +45,22 @@ Key modulation scales are defined in `App.tsx` (`MOD_SCALES`) and must match the
 ### Type System (`types.ts`)
 
 - `GranularParams`: All synthesizer parameters with min/max ranges in comments
+  - New: `grainReversalChance` (0-1) - Probability of grain reversal
+  - New: `spectralFreeze` (boolean) - Enable spectral freeze effect
 - `DEFAULT_PARAMS`: Default values for all parameters
+  - `grainReversalChance`: 0 (no reversal)
+  - `spectralFreeze`: false (off)
 - `FACTORY_PRESETS`: 6 factory presets showcasing different synthesis techniques
 - `ThemeColors`: Complete theming system for dark/light modes
 
 ### UI Structure (`App.tsx`)
 
-The main app renders a Eurorack-style modular interface with 5 panels:
+The main app renders a Eurorack-style modular interface with panels:
 1. **Transport/Global**: Play/stop, sample loading, preset management
-2. **GRAIN**: Grain size, density, position (playhead), spread, panning
+   - Buttons: PLAY, LOAD WAV, RANDOMIZE, UNDO/REDO, FREEZE, SPECTRAL, DRIFT, Texture Profile, Preset
+2. **GRAIN**: Grain size, density, position (playhead), spread, panning, reversal
+   - 3-column grid with 6 knobs total
+   - New: Reverse knob controls grain reversal probability (%)
 3. **FM/PITCH**: Pitch transposition, FM frequency and amount
 4. **AMP ENV**: Attack/release with linear/exponential curve selection
 5. **LFO/MOD**: LFO rate, depth, waveform selection, target mapping
@@ -119,6 +126,20 @@ The main app renders a Eurorack-style modular interface with 5 panels:
 - **Format**: WebM audio
 - **Usage**: Click REC button to start/stop, auto-downloads with timestamp
 - **File naming**: `nodegrain_recording_YYYY-MM-DDTHH-MM-SS.webm`
+
+### Spectral Freeze
+- **Location**: `services/audioEngine.ts` (freeze buffer), `App.tsx` (SPECTRAL button in transport)
+- **Function**: Freezes and loops audio output with subtle LFO modulation
+- **Usage**: Click SPECTRAL button to freeze/unfreeze
+- **Creates**: Ethereal, evolving ambient textures
+- **Implementation**: Captures audio buffer, loops with slow LFO modulation
+
+### Grain Reversal
+- **Location**: `services/audioEngine.ts` (playGrain method), `App.tsx` (Reverse knob in GRAIN panel)
+- **Parameter**: `grainReversalChance` (0-1, percentage)
+- **Function**: Random probability of grains playing backwards
+- **Creates**: Glitchy, reversed textures and stutters
+- **Implementation**: Random check per grain, negative playbackRate for reversed grains
 
 ### Help Modal
 - **Location**: `App.tsx` (showHelp state, modal JSX)
