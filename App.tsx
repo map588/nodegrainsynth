@@ -1073,7 +1073,7 @@ export const App: React.FC = () => {
                             modulatedValue={getModulatedValue('density', params.density, 0.01, 0.2)}
                             min={0.01} max={0.2}
                             {...createKnobHandlers('density')}
-                            unit="s"
+                            unit="Hz"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('density')}
                             onToggleTarget={() => toggleLfoTarget('density')}
@@ -1096,6 +1096,7 @@ export const App: React.FC = () => {
                             modulatedValue={getModulatedValue('panSpread', params.panSpread, 0, 1)}
                             min={0} max={1}
                             {...createKnobHandlers('panSpread')}
+                            unit="%"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('panSpread')}
                             onToggleTarget={() => toggleLfoTarget('panSpread')}
@@ -1223,6 +1224,7 @@ export const App: React.FC = () => {
                                 value={params.attack}
                                 min={0.01} max={0.9}
                                 {...createKnobHandlers('attack')}
+                                unit="s"
                                 isMapping={isMappingMode}
                                 isTargeted={params.lfoTargets.includes('attack')}
                                 onToggleTarget={() => toggleLfoTarget('attack')}
@@ -1233,6 +1235,7 @@ export const App: React.FC = () => {
                                 value={params.release}
                                 min={0.01} max={0.9}
                                 {...createKnobHandlers('release')}
+                                unit="s"
                                 isMapping={isMappingMode}
                                 isTargeted={params.lfoTargets.includes('release')}
                                 onToggleTarget={() => toggleLfoTarget('release')}
@@ -1281,6 +1284,7 @@ export const App: React.FC = () => {
                                 value={params.lfoAmount}
                                 min={0} max={1}
                                 {...createKnobHandlers('lfoAmount')}
+                                unit="%"
                                 colors={colors}
                             />
                         </div>
@@ -1369,6 +1373,7 @@ export const App: React.FC = () => {
                             modulatedValue={getModulatedValue('filterRes', params.filterRes, 0, 20)}
                             min={0} max={20}
                             {...createKnobHandlers('filterRes')}
+                            unit="dB"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('filterRes')}
                             onToggleTarget={() => toggleLfoTarget('filterRes')}
@@ -1380,6 +1385,7 @@ export const App: React.FC = () => {
                             modulatedValue={getModulatedValue('distAmount', params.distAmount, 0, 1)}
                             min={0} max={1}
                             {...createKnobHandlers('distAmount')}
+                            unit="%"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('distAmount')}
                             onToggleTarget={() => toggleLfoTarget('distAmount')}
@@ -1405,6 +1411,7 @@ export const App: React.FC = () => {
                             modulatedValue={getModulatedValue('delayFeedback', params.delayFeedback, 0, 0.95)}
                             min={0} max={0.95}
                             {...createKnobHandlers('delayFeedback')}
+                            unit="%"
                             isMapping={isMappingMode}
                             isTargeted={params.lfoTargets.includes('delayFeedback')}
                             onToggleTarget={() => toggleLfoTarget('delayFeedback')}
@@ -1445,7 +1452,7 @@ export const App: React.FC = () => {
                             value={params.volume}
                             min={0} max={1}
                             {...createKnobHandlers('volume')}
-                            unit="db"
+                            unit="dB"
                             colors={colors}
                         />
                     </div>

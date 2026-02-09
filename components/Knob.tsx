@@ -126,11 +126,12 @@ export const Knob: React.FC<KnobProps> = ({
   const disabledOpacity = disabled ? 'opacity-40 cursor-not-allowed' : '';
 
   return (
-    <div className={`flex flex-col items-center gap-1 w-16 ${mappingOpacity} ${disabledOpacity}`}>
+    <div className={`flex flex-col items-center gap-1 w-16 ${mappingOpacity} ${disabledOpacity}`} style={{ userSelect: 'none' }}>
       {/* Knob SVG */}
       <div
         className={`relative w-12 h-12 ${disabled ? 'cursor-not-allowed' : mappingCursor} group`}
         onMouseDown={handleMouseDown}
+        style={{ userSelect: 'none' }}
       >
         <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
             {/* Background Track */}
@@ -171,11 +172,11 @@ export const Knob: React.FC<KnobProps> = ({
       </div>
 
       {/* Label & Value */}
-      <div className="text-center w-full">
+      <div className="text-center w-full" style={{ userSelect: 'none' }}>
         <div className={`text-[10px] uppercase font-bold tracking-wider mb-[2px] ${labelColor} transition-colors duration-200`}>{label}</div>
-        <div 
+        <div
             className="text-xs font-mono px-1 py-[1px] border border-transparent rounded-sm w-full text-center transition-colors duration-200"
-            style={{ backgroundColor: colors.knobValueBg, color: colors.knobValueText ? undefined : '#fb923c' }}
+            style={{ backgroundColor: colors.knobValueBg, color: colors.knobValueText ? undefined : '#fb923c', userSelect: 'none' }}
         >
           <span className={colors.knobValueText}>{displayValue}</span>
           {unit && <span className="text-[9px] ml-[1px] opacity-60">{unit}</span>}
