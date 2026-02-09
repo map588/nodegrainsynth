@@ -4,6 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## NodeGrain - Granular Audio Synthesizer
 
+**GitHub**: https://github.com/OnlyJones/nodegrainsynth
+**Dev URL**: http://localhost:3000
+
 A web-based granular synthesizer built with React and TypeScript using the Web Audio API. The app creates a virtual Eurorack-style synth interface for granular synthesis of audio samples.
 
 ## Development Commands
@@ -96,3 +99,115 @@ The main app renders a Eurorack-style modular interface with 5 panels:
 ├── vite.config.ts          # Vite configuration
 └── package.json
 ```
+
+## Features Added (Post-Initial Development)
+
+### Texture Profile Randomizer
+- **Location**: `types.ts` (TEXTURE_PROFILES), `App.tsx` (dropdown & button)
+- **6 Profiles**: cloudy, glitch, drone, shimmer, rhythmic, crystalline
+- **Behavior**: Dropdown immediately applies baseParams, button randomizes within profile constraints
+- **Function**: `randomizeTextureProfile()` in types.ts
+
+### XY Pad Mode
+- **Location**: `components/WaveformDisplay.tsx`, `App.tsx`
+- **Activation**: XY button in top-right of waveform display
+- **3 Y-axis mappings**: Pitch, Density, Grain Size (select via dropdown)
+- **X-axis**: Always controls grain position through sample
+
+### Recording
+- **Location**: `services/audioEngine.ts` (MediaRecorder), `App.tsx` (REC button)
+- **Format**: WebM audio
+- **Usage**: Click REC button to start/stop, auto-downloads with timestamp
+- **File naming**: `nodegrain_recording_YYYY-MM-DDTHH-MM-SS.webm`
+
+### Help Modal
+- **Location**: `App.tsx` (showHelp state, modal JSX)
+- **Content**: Complete documentation of all knobs, buttons, and features
+- **Theme-aware**: Matches dark/light mode
+
+### Monetization
+- **Buy Me a Coffee**: Button in header links to buymeacoffee.com/rigs
+- **Icon**: Coffee cup from lucide-react
+
+### Grain Freeze & Drift
+- **Freeze**: Locks grain position, creates frozen textures
+- **Drift**: Auto-moves grain position slowly for evolving textures
+
+## Git & Deployment
+
+### Repository Info
+- **Owner**: OnlyJones
+- **Email**: rigsyjon@gmail.com
+- **Repo**: nodegrainsynth
+- **Remote**: https://github.com/OnlyJones/nodegrainsynth.git
+
+### Git Configuration
+```bash
+git config user.name "OnlyJones"
+git config user.email "rigsyjon@gmail.com"
+```
+
+### Authentication
+- Uses GitHub Personal Access Token
+- **IMPORTANT**: Never share tokens in chat or commit them
+- After use, remove from remote URL: `git remote set-url origin https://github.com/OnlyJones/nodegrainsynth.git`
+
+### Branches
+- **main**: Primary branch for production
+- **backup-before-push**: Safety branch created before GitHub operations
+
+### Deployment Commands
+```bash
+# Build for production
+npm run build
+
+# Output goes to dist/ folder (270 kB, 79 kB gzipped)
+# Upload dist/ folder to hosting provider
+```
+
+### Hosting Options
+- **Vercel** (recommended): Free tier, drag & drop dist/ folder, custom domain support
+- **Netlify**: Free tier, drag & drop dist/ folder
+- **GitHub Pages**: Free, requires GitHub Actions setup
+
+### SEO & Social
+- **Title**: NodeGrain - Free Web-Based Granular Synthesizer
+- **Open Graph tags**: Added for social sharing
+- **Favicon**: 🎛️ emoji SVG
+
+## Common Tasks
+
+### Add New Parameter
+1. Add to `GranularParams` type in types.ts
+2. Add default value to `DEFAULT_PARAMS`
+3. Add to `MOD_SCALES` in App.tsx if LFO modulatable
+4. Add UI controls in App.tsx
+5. Handle in `AudioEngine.updateParams()`
+6. Add to help modal
+
+### Debug Audio Issues
+- Check browser console for Web Audio API errors
+- Verify `AudioEngine` instance exists: `engineRef.current`
+- Check grain scheduling in `schedule()` method
+- Visualization events emitted via `grainEvents` callback
+
+### Theme Colors
+All colors defined in `THEME_COLORS` object (types.ts):
+- `dark`: Dark mode colors (rack border, panels, knobs, labels)
+- `light`: Light mode variant
+
+When adding new UI elements, use theme-aware styling:
+```tsx
+style={{ backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff' }}
+```
+
+## Build Size Optimization
+
+Current bundle: **270 kB** (79 kB gzipped)
+- All dependencies tree-shaken by Vite
+- Tailwind CSS via CDN (not bundled)
+- No unnecessary dependencies
+
+To reduce further:
+- Consider removing unused lucide-react icons
+- Code splitting if app grows significantly
