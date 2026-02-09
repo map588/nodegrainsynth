@@ -40,7 +40,8 @@ export interface GranularParams {
   density: number; // Time between grains in seconds (0.01 - 0.2)
   spread: number; // Random position offset in seconds (0 - 2)
   position: number; // Center playhead position (0 - 1 normalized)
-  
+  grainReversalChance: number; // Probability of grain playing backwards (0 - 1)
+
   // Stereo
   pan: number; // Center pan position (-1 to 1)
   panSpread: number; // Random pan spread (0 to 1)
@@ -63,6 +64,7 @@ export interface GranularParams {
   delayMix: number; // Delay wet mix (0 - 1)
   reverbMix: number; // 0 (dry) to 1 (wet)
   reverbDecay: number; // Impulse response duration in seconds
+  spectralFreeze: boolean; // Freeze the current audio spectrum
   
   // LFO
   lfoRate: number; // Frequency in Hz (0.1 - 20)
@@ -81,6 +83,7 @@ export const DEFAULT_PARAMS: GranularParams = {
   density: 0.05,
   spread: 0.2,
   position: 0.2,
+  grainReversalChance: 0,
   pan: 0,
   panSpread: 0.5,
   pitch: 0,
@@ -96,6 +99,7 @@ export const DEFAULT_PARAMS: GranularParams = {
   delayMix: 0,
   reverbMix: 0.2,
   reverbDecay: 2.0,
+  spectralFreeze: false,
   lfoRate: 1.0,
   lfoAmount: 0.5,
   lfoShape: 'sine',

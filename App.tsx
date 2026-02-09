@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, FolderOpen, Volume2, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee } from 'lucide-react';
+import { Play, Pause, FolderOpen, Volume2, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee, Radio } from 'lucide-react';
 import { GranularParams, DEFAULT_PARAMS, LfoShape, EnvelopeCurve, ThemeColors, FACTORY_PRESETS, Preset, ScaleType, SCALE_INTERVALS, snapPitchToScale, TextureProfileType, TEXTURE_PROFILES, randomizeTextureProfile } from './types';
 import { AudioEngine } from './services/audioEngine';
 import { Knob } from './components/Knob';
@@ -79,6 +79,7 @@ export const App: React.FC = () => {
   const [params, setParams] = useState<GranularParams>(DEFAULT_PARAMS);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
+  const [isSpectralFreeze, setIsSpectralFreeze] = useState(false);
   const [isDrifting, setIsDrifting] = useState(false);
   const [driftSpeed, setDriftSpeed] = useState(0.5);
   const [driftReturnTendency, setDriftReturnTendency] = useState(0.3);
@@ -311,6 +312,12 @@ export const App: React.FC = () => {
       }
   };
 
+  const handleSpectralFreezeToggle = () => {
+      if (!engineRef.current) return;
+      engineRef.current.toggleSpectralFreeze();
+      setIsSpectralFreeze(engineRef.current.isSpectralFreezeActive());
+  };
+
   const handleDriftToggle = () => {
       if (!engineRef.current) return;
 
@@ -431,6 +438,7 @@ export const App: React.FC = () => {
           density: parseFloat(rand(0.01, 0.15).toFixed(3)),
           spread: parseFloat(rand(0, 1).toFixed(3)),
           position: parseFloat(rand(0, 1).toFixed(3)),
+          grainReversalChance: 0,
           pan: parseFloat(rand(-1, 1).toFixed(2)),
           panSpread: parseFloat(rand(0, 1).toFixed(2)),
           pitch: randInt(-12, 12),
@@ -445,6 +453,7 @@ export const App: React.FC = () => {
           delayFeedback: parseFloat(rand(0, 0.7).toFixed(3)),
           delayMix: parseFloat(rand(0, 0.5).toFixed(3)),
           reverbMix: parseFloat(rand(0, 0.7).toFixed(3)),
+          spectralFreeze: false,
           reverbDecay: parseFloat(rand(0.5, 3).toFixed(2)),
           lfoRate: parseFloat(rand(0.2, 8).toFixed(2)),
           lfoAmount: parseFloat(rand(0.2, 0.8).toFixed(2)),
@@ -918,6 +927,21 @@ export const App: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={handleSpectralFreezeToggle}
+                        title="Spectral freeze - freeze and loop audio output"
+                        className={`w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110
+                            ${isSpectralFreeze ? 'ring-2 ring-purple-400' : ''}`}
+                        style={{
+                            backgroundColor: isSpectralFreeze ? '#a855f7' : colors.labelDefault,
+                            borderColor: colors.moduleBorder,
+                            color: isSpectralFreeze ? '#fff' : colors.labelTextDefault
+                        }}
+                    >
+                        <Radio size={14}/>
+                        {isSpectralFreeze ? 'UNFREEZE' : 'SPECTRAL'}
+                    </button>
+
+                    <button
                         onClick={handleDriftToggle}
                         title="Auto-drift position for organic textures"
                         className={`w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110
@@ -929,7 +953,7 @@ export const App: React.FC = () => {
                         }}
                     >
                         <Wind size={14}/>
-                        {isDrifting ? 'DRIFT ON' : 'DRIFT'}
+                        DRIFT
                     </button>
 
                     <div className="w-full h-[1px] bg-neutral-400/30 my-0.5"></div>
@@ -1037,7 +1061,7 @@ export const App: React.FC = () => {
                         className="absolute top-0 left-0 w-full text-[10px] font-bold px-2 py-[2px] transition-colors duration-300"
                         style={{ backgroundColor: colors.labelDefault, color: colors.labelTextDefault }}
                     >GRAIN</div>
-                    <div className="pt-6 px-1 grid grid-cols-2 gap-x-2 gap-y-3">
+                    <div className="pt-6 px-1 grid grid-cols-3 gap-x-2 gap-y-3">
                         <Knob
                             label="File Pos"
                             value={params.position}
@@ -1114,6 +1138,19 @@ export const App: React.FC = () => {
                             onToggleTarget={() => toggleLfoTarget('panSpread')}
                             colors={colors}
                             defaultValue={DEFAULT_PARAMS.panSpread}
+                        />
+                        <Knob
+                            label="Reverse"
+                            value={params.grainReversalChance}
+                            modulatedValue={getModulatedValue('grainReversalChance', params.grainReversalChance, 0, 1)}
+                            min={0} max={1}
+                            {...createKnobHandlers('grainReversalChance')}
+                            unit="%"
+                            isMapping={isMappingMode}
+                            isTargeted={params.lfoTargets.includes('grainReversalChance')}
+                            onToggleTarget={() => toggleLfoTarget('grainReversalChance')}
+                            colors={colors}
+                            defaultValue={DEFAULT_PARAMS.grainReversalChance}
                         />
                     </div>
                 </div>
