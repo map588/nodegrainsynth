@@ -69,6 +69,7 @@ export const Knob: React.FC<KnobProps> = ({
     if (disabled || !defaultValue) return;
     setInternalValue(defaultValue);
     onChange(defaultValue);
+    onDragEnd?.(defaultValue);
   };
 
   useEffect(() => {
