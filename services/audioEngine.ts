@@ -409,7 +409,9 @@ export class AudioEngine {
     const grainDuration = Math.max(0.01, grainSize);
     const bufferDuration = this.buffer.duration;
     const centerTime = position * bufferDuration;
-    const randomOffset = (Math.random() * spread * 2 - spread);
+    // Scale random offset by buffer duration so spread is relative to sample length
+    // Increased sensitivity for more noticeable spray effect
+    const randomOffset = (Math.random() * spread * 2 - spread) * bufferDuration * 0.5;
     let startTime = centerTime + randomOffset;
     
     if (startTime < 0) startTime = 0;

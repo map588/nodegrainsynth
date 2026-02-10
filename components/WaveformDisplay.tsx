@@ -172,8 +172,8 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
 
             // Calculate size based on grain duration (larger grains = bigger particles)
             const baseSize = Math.max(6, Math.min(35, p.duration * 60));
-            const sizeMultiplier = 1.0 + (p.duration * 0.6); // 1.0 to 1.6x based on duration
-            const pw = Math.max(5, p.width * width * sizeMultiplier);
+            const sizeMultiplier = 2.5 + (p.duration * 1.2); // 2.5 to 3.7x based on duration - longer grains
+            const pw = Math.max(10, p.width * width * sizeMultiplier);
             const px = p.x * width;
 
             // Add glow effect for high-life particles
@@ -229,7 +229,8 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
 
         // 4. Draw Playhead / Spray Target
         const x = params.position * width;
-        const sprayW = (params.spread * 50);
+        // Match visual spray zone to actual grain spread range (increased sensitivity)
+        const sprayW = params.spread * (width / 2) * 1.0; // Matches audio grain spread
 
         // Spray Zone (Color inversion for visibility on light theme?)
         // Using white with low opacity works on dark, but on white bg it's invisible.
