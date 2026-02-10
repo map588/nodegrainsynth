@@ -158,14 +158,13 @@ The main app renders a Eurorack-style modular interface with panels:
 
 ### Repository Info
 - **Owner**: OnlyJones
-- **Email**: rigsyjon@gmail.com
 - **Repo**: nodegrainsynth
 - **Remote**: https://github.com/OnlyJones/nodegrainsynth.git
 
 ### Git Configuration
 ```bash
 git config user.name "OnlyJones"
-git config user.email "rigsyjon@gmail.com"
+git config user.email "your-email@example.com"
 ```
 
 ### Authentication
