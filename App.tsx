@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, FolderOpen, Volume2, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee } from 'lucide-react';
+import { Play, Pause, FolderOpen, Volume2, VolumeX, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee } from 'lucide-react';
 import { GranularParams, DEFAULT_PARAMS, LfoShape, EnvelopeCurve, ThemeColors, FACTORY_PRESETS, Preset, ScaleType, SCALE_INTERVALS, snapPitchToScale, TextureProfileType, TEXTURE_PROFILES, randomizeTextureProfile } from './types';
 import { AudioEngine } from './services/audioEngine';
 import { Knob } from './components/Knob';
@@ -101,6 +101,11 @@ export const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [currentPresetName, setCurrentPresetName] = useState<string>("Init Saw");
   const [showHelp, setShowHelp] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [preMuteVolume, setPreMuteVolume] = useState<number>(DEFAULT_PARAMS.volume);
+  const [showCpuMeter, setShowCpuMeter] = useState(false);
+  const [fps, setFps] = useState(60);
+  const [frameTime, setFrameTime] = useState(0);
 
   // Undo/Redo history
   const [history, setHistory] = useState<GranularParams[]>([DEFAULT_PARAMS]);
@@ -155,6 +160,34 @@ export const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [params.lfoRate, params.lfoShape, params.lfoTargets]);
 
+  // CPU/FPS Meter
+  useEffect(() => {
+    let frameId: number;
+    let lastTime = performance.now();
+    let frames = 0;
+    let lastFpsUpdate = lastTime;
+
+    const measureFps = () => {
+      const now = performance.now();
+      frames++;
+
+      if (now - lastFpsUpdate >= 500) { // Update every 500ms
+        const fps = Math.round((frames / (now - lastFpsUpdate)) * 1000);
+        const frameTime = (now - lastFpsUpdate) / frames;
+        setFps(fps);
+        setFrameTime(frameTime);
+        frames = 0;
+        lastFpsUpdate = now;
+      }
+
+      lastTime = now;
+      frameId = requestAnimationFrame(measureFps);
+    };
+
+    measureFps();
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
   // Snap pitch to scale when harmonic lock is enabled or scale changes
   useEffect(() => {
     if (isHarmonicLockEnabled) {
@@ -175,6 +208,19 @@ export const App: React.FC = () => {
     // If user changes a param manually, we are no longer strictly on the preset
     if (currentPresetName && !currentPresetName.endsWith('*')) {
         setCurrentPresetName(prev => prev + "*");
+    }
+  };
+
+  const handleToggleMute = () => {
+    if (isMuted) {
+      // Unmute - restore previous volume
+      setIsMuted(false);
+      handleParamChange('volume', preMuteVolume);
+    } else {
+      // Mute - save current volume and set to 0
+      setIsMuted(true);
+      setPreMuteVolume(params.volume);
+      handleParamChange('volume', 0);
     }
   };
 
@@ -719,8 +765,69 @@ export const App: React.FC = () => {
                      <span>Support Me</span>
                  </a>
                  <div className="w-[1px] h-4 bg-neutral-400 mx-1"></div>
-                 <button className={`${colors.headerText} opacity-70 hover:opacity-100`}><Activity size={16}/></button>
-                 <button className={`${colors.headerText} opacity-70 hover:opacity-100`}><Volume2 size={16}/></button>
+                 <button
+                     onClick={(e) => {
+                         e.stopPropagation();
+                         setShowCpuMeter(!showCpuMeter);
+                     }}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 relative ${showCpuMeter ? 'text-green-400' : ''}`}
+                     title="CPU Meter"
+                 >
+                     <Activity size={16}/>
+                     {showCpuMeter && (
+                         <div
+                             onClick={(e) => e.stopPropagation()}
+                             className="absolute top-full right-0 mt-2 p-3 rounded-md shadow-2xl z-[9999] min-w-[140px] border-2"
+                             style={{
+                                 backgroundColor: colors.moduleBg,
+                                 borderColor: showCpuMeter ? '#22c55e' : colors.moduleBorder,
+                                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                             }}
+                         >
+                             <div className="space-y-2">
+                                 <div className="flex justify-between items-center text-xs font-semibold"
+                                     style={{ color: colors.labelTextDefault }}
+                                 >
+                                     <span>FPS</span>
+                                     <span className={`font-mono ${fps >= 50 ? 'text-green-400' : fps >= 30 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                         {fps}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-xs font-semibold"
+                                     style={{ color: colors.labelTextDefault }}
+                                 >
+                                     <span>Frame</span>
+                                     <span className="font-mono" style={{ color: frameTime < 20 ? '#22c55e' : frameTime < 35 ? '#eab308' : '#ef4444' }}>
+                                         {frameTime.toFixed(1)}ms
+                                     </span>
+                                 </div>
+                                 <div className="h-2 rounded-full overflow-hidden"
+                                     style={{ backgroundColor: colors.knobBase }}
+                                 >
+                                     <div
+                                         className="h-full transition-all duration-300 rounded-full"
+                                         style={{
+                                             width: `${Math.min(100, (fps / 60) * 100)}%`,
+                                             backgroundColor: fps >= 50 ? '#22c55e' : fps >= 30 ? '#eab308' : '#ef4444'
+                                         }}
+                                     />
+                                 </div>
+                                 <div className="text-[9px] text-center font-medium"
+                                     style={{ color: colors.knobLabel }}
+                                 >
+                                     {fps >= 50 ? 'Good' : fps >= 30 ? 'Fair' : 'Heavy Load'}
+                                 </div>
+                             </div>
+                         </div>
+                     )}
+                 </button>
+                 <button
+                     onClick={handleToggleMute}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 ${isMuted ? 'text-red-400' : ''}`}
+                     title={isMuted ? 'Unmute' : 'Mute'}
+                 >
+                     {isMuted ? <VolumeX size={16}/> : <Volume2 size={16}/>}
+                 </button>
                  <div className="w-[1px] h-4 bg-neutral-400 mx-1"></div>
                  <button onClick={toggleTheme} className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95`}>
                      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
