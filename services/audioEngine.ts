@@ -54,14 +54,6 @@ export class AudioEngine {
   private driftReturnTendency: number = 0.3; // 0-1, how much it wants to return to base
   private driftTime: number = 0;
 
-  // Spectral Freeze
-  private isSpectralFreeze: boolean = false;
-  private freezeBuffer: AudioBuffer | null = null;
-  private freezeSource: AudioBufferSourceNode | null = null;
-  private freezeGain: GainNode | null = null;
-  private freezeLfo: OscillatorNode | null = null;
-  private freezeLfoGain: GainNode | null = null;
-
   constructor(initialParams: GranularParams) {
     this.params = initialParams;
   }
@@ -226,13 +218,6 @@ export class AudioEngine {
     if (Math.abs(this.params.reverbDecay - this.lastReverbDecay) > 0.1) {
         this.updateReverbImpulse();
     }
-
-    // Spectral Freeze (handle toggle from UI)
-    if (this.params.spectralFreeze && !this.isSpectralFreeze) {
-        this.startSpectralFreeze();
-    } else if (!this.params.spectralFreeze && this.isSpectralFreeze) {
-        this.stopSpectralFreeze();
-    }
   }
 
   pollGrainEvents(): GrainEvent[] {
@@ -305,7 +290,7 @@ export class AudioEngine {
     // Lookahead scheduling
     while (this.nextGrainTime < this.ctx.currentTime + 0.1) {
       this.playGrain(this.nextGrainTime);
-      
+
       // Apply LFO to density if needed
       let density = this.params.density;
       if (this.params.lfoTargets.includes('density')) {
@@ -314,7 +299,7 @@ export class AudioEngine {
           // Scale: +/- 0.1s
           density += lfoVal * this.params.lfoAmount * 0.1;
       }
-      
+
       density = Math.max(0.005, density);
       this.nextGrainTime += density;
     }
@@ -431,30 +416,32 @@ export class AudioEngine {
     if (startTime > bufferDuration - grainDuration) startTime = bufferDuration - grainDuration;
 
     // 7. Apply Envelope
-    envelope.gain.setValueAtTime(0, time);
-    
     const attackTime = grainDuration * attack;
     const releaseTime = grainDuration * release;
     const sustainTime = Math.max(0, grainDuration - attackTime - releaseTime);
-    
+
     const isExp = this.params.envelopeCurve === 'exponential';
     const minVal = 0.001;
 
+    // Small fade-in to prevent clicks at grain boundaries
+    const fadeTime = Math.max(0.001, grainDuration * 0.01);
+    envelope.gain.setValueAtTime(0, time);
+    envelope.gain.linearRampToValueAtTime(minVal, time + fadeTime);
+
     // Attack
     if (isExp) {
-      envelope.gain.setValueAtTime(minVal, time);
-      envelope.gain.exponentialRampToValueAtTime(1, time + attackTime);
+      envelope.gain.exponentialRampToValueAtTime(1, time + fadeTime + attackTime);
     } else {
-      envelope.gain.linearRampToValueAtTime(1, time + attackTime);
+      envelope.gain.linearRampToValueAtTime(1, time + fadeTime + attackTime);
     }
     
     // Sustain & Release
-    const releaseStart = time + attackTime + sustainTime;
+    const releaseStart = time + fadeTime + attackTime + sustainTime;
     envelope.gain.setValueAtTime(1, releaseStart);
-    
+
     if (isExp) {
         envelope.gain.exponentialRampToValueAtTime(minVal, time + grainDuration);
-        envelope.gain.setValueAtTime(0, time + grainDuration);
+        envelope.gain.linearRampToValueAtTime(0, time + grainDuration + 0.001);
     } else {
         envelope.gain.linearRampToValueAtTime(0, time + grainDuration);
     }
@@ -542,103 +529,6 @@ export class AudioEngine {
 
   getDriftPosition(): number {
       return this.driftPosition;
-  }
-
-  // Spectral Freeze methods
-  toggleSpectralFreeze() {
-      if (this.isSpectralFreeze) {
-          this.stopSpectralFreeze();
-      } else {
-          this.startSpectralFreeze();
-      }
-  }
-
-  private startSpectralFreeze() {
-      if (!this.ctx) return;
-      this.isSpectralFreeze = true;
-
-      // Create a freeze buffer by capturing current audio
-      // We'll use a short buffer that loops with modulation
-      const freezeDuration = 2.0; // 2 seconds loop
-      this.freezeBuffer = this.ctx.createBuffer(2, this.ctx.sampleRate * freezeDuration, this.ctx.sampleRate);
-
-      // Fill with white noise initially (will be replaced by actual audio capture)
-      for (let channel = 0; channel < 2; channel++) {
-          const data = this.freezeBuffer.getChannelData(channel);
-          for (let i = 0; i < data.length; i++) {
-              data[i] = 0;
-          }
-      }
-
-      // Create the freeze source
-      this.freezeSource = this.ctx.createBufferSource();
-      this.freezeSource.buffer = this.freezeBuffer;
-      this.freezeSource.loop = true;
-
-      // Create gain node for freeze volume
-      this.freezeGain = this.ctx.createGain();
-      this.freezeGain.gain.value = 0;
-
-      // Create subtle LFO for modulation
-      this.freezeLfo = this.ctx.createOscillator();
-      this.freezeLfo.frequency.value = 0.2; // Slow modulation
-      this.freezeLfoGain = this.ctx.createGain();
-      this.freezeLfoGain.gain.value = 0.05;
-
-      // Connect: LFO -> LFO Gain -> Freeze Gain
-      this.freezeLfo.connect(this.freezeLfoGain);
-      this.freezeLfoGain.connect(this.freezeGain.gain);
-
-      // Connect freeze source to output
-      this.freezeSource.connect(this.freezeGain);
-      this.freezeGain.connect(this.filterNode);
-
-      // Start everything
-      this.freezeSource.start(this.ctx.currentTime + 0.1);
-      this.freezeLfo.start(this.ctx.currentTime + 0.1);
-
-      // Fade in the freeze over 0.5 seconds
-      this.freezeGain.gain.setTargetAtTime(0.5, this.ctx.currentTime, 0.5);
-  }
-
-  private stopSpectralFreeze() {
-      if (!this.ctx || !this.freezeSource) return;
-      this.isSpectralFreeze = false;
-
-      // Fade out over 0.3 seconds
-      if (this.freezeGain) {
-          this.freezeGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
-      }
-
-      // Stop and clean up after fade
-      setTimeout(() => {
-          if (this.freezeSource) {
-              try {
-                  this.freezeSource.stop();
-              } catch (e) {}
-              this.freezeSource.disconnect();
-              this.freezeSource = null;
-          }
-          if (this.freezeLfo) {
-              try {
-                  this.freezeLfo.stop();
-              } catch (e) {}
-              this.freezeLfo.disconnect();
-              this.freezeLfo = null;
-          }
-          if (this.freezeGain) {
-              this.freezeGain.disconnect();
-              this.freezeGain = null;
-          }
-          if (this.freezeLfoGain) {
-              this.freezeLfoGain.disconnect();
-              this.freezeLfoGain = null;
-          }
-      }, 400);
-  }
-
-  isSpectralFreezeActive(): boolean {
-      return this.isSpectralFreeze;
   }
 
   // Update drift position based on random walk

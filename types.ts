@@ -64,8 +64,7 @@ export interface GranularParams {
   delayMix: number; // Delay wet mix (0 - 1)
   reverbMix: number; // 0 (dry) to 1 (wet)
   reverbDecay: number; // Impulse response duration in seconds
-  spectralFreeze: boolean; // Freeze the current audio spectrum
-  
+
   // LFO
   lfoRate: number; // Frequency in Hz (0.1 - 20)
   lfoAmount: number; // Modulation depth (0 - 1)
@@ -90,16 +89,15 @@ export const DEFAULT_PARAMS: GranularParams = {
   detune: 10,
   fmFreq: 50,
   fmAmount: 0,
-  attack: 0.4,
-  release: 0.4,
-  envelopeCurve: 'linear',
+  attack: 0.5,
+  release: 0.5,
+  envelopeCurve: 'exponential',
   distAmount: 0,
   delayTime: 0.3,
   delayFeedback: 0.4,
   delayMix: 0,
   reverbMix: 0.2,
   reverbDecay: 2.0,
-  spectralFreeze: false,
   lfoRate: 1.0,
   lfoAmount: 0.5,
   lfoShape: 'sine',

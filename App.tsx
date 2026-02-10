@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, FolderOpen, Volume2, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee, Radio } from 'lucide-react';
+import { Play, Pause, FolderOpen, Volume2, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee } from 'lucide-react';
 import { GranularParams, DEFAULT_PARAMS, LfoShape, EnvelopeCurve, ThemeColors, FACTORY_PRESETS, Preset, ScaleType, SCALE_INTERVALS, snapPitchToScale, TextureProfileType, TEXTURE_PROFILES, randomizeTextureProfile } from './types';
 import { AudioEngine } from './services/audioEngine';
 import { Knob } from './components/Knob';
@@ -79,7 +79,6 @@ export const App: React.FC = () => {
   const [params, setParams] = useState<GranularParams>(DEFAULT_PARAMS);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
-  const [isSpectralFreeze, setIsSpectralFreeze] = useState(false);
   const [isDrifting, setIsDrifting] = useState(false);
   const [driftSpeed, setDriftSpeed] = useState(0.5);
   const [driftReturnTendency, setDriftReturnTendency] = useState(0.3);
@@ -312,14 +311,6 @@ export const App: React.FC = () => {
       }
   };
 
-  const handleSpectralFreezeToggle = () => {
-      if (!engineRef.current) return;
-      const newState = !params.spectralFreeze;
-      setParams({ ...params, spectralFreeze: newState });
-      engineRef.current.updateParams({ ...params, spectralFreeze: newState });
-      setIsSpectralFreeze(newState);
-  };
-
   const handleDriftToggle = () => {
       if (!engineRef.current) return;
 
@@ -455,7 +446,6 @@ export const App: React.FC = () => {
           delayFeedback: parseFloat(rand(0, 0.7).toFixed(3)),
           delayMix: parseFloat(rand(0, 0.5).toFixed(3)),
           reverbMix: parseFloat(rand(0, 0.7).toFixed(3)),
-          spectralFreeze: false,
           reverbDecay: parseFloat(rand(0.5, 3).toFixed(2)),
           lfoRate: parseFloat(rand(0.2, 8).toFixed(2)),
           lfoAmount: parseFloat(rand(0.2, 0.8).toFixed(2)),
@@ -926,21 +916,6 @@ export const App: React.FC = () => {
                     >
                         <Snowflake size={14}/>
                         {isFrozen ? 'UNFREEZE' : 'FREEZE'}
-                    </button>
-
-                    <button
-                        onClick={handleSpectralFreezeToggle}
-                        title="Spectral freeze - freeze and loop audio output"
-                        className={`w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110
-                            ${isSpectralFreeze ? 'ring-2 ring-purple-400' : ''}`}
-                        style={{
-                            backgroundColor: isSpectralFreeze ? '#a855f7' : colors.labelDefault,
-                            borderColor: colors.moduleBorder,
-                            color: isSpectralFreeze ? '#fff' : colors.labelTextDefault
-                        }}
-                    >
-                        <Radio size={14}/>
-                        {isSpectralFreeze ? 'UNFREEZE' : 'SPECTRAL'}
                     </button>
 
                     <button

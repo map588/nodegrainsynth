@@ -20,6 +20,9 @@ interface Particle {
     life: number; // 0-1
     decay: number; // per frame
     color: string;
+    trail: number[]; // previous positions for trail effect
+    pan: number; // pan position -1 to 1
+    duration: number; // grain duration in seconds
 }
 
 export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
@@ -137,20 +140,26 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
                 const normWidth = bufferDur > 0 ? (e.duration / bufferDur) : 0.01;
                 const decay = 1 / (Math.max(0.1, e.duration) * 60);
 
-                // Color based on Pan
-                let color = `rgba(251, 146, 60,`; // default center (Orange)
+                // Color based on pan position: left=blue, center=purple, right=red
+                let color = `rgba(168, 85, 247,`; // purple (center)
                 if (e.pan < -0.2) {
-                    color = `rgba(34, 211, 238,`; // Cyan
+                    color = `rgba(59, 130, 246,`; // blue (left)
                 } else if (e.pan > 0.2) {
-                    color = `rgba(232, 121, 249,`; // Pink
+                    color = `rgba(239, 68, 68,`; // red (right)
                 }
+
+                // Initialize trail with starting position
+                const trailLength = Math.floor(Math.max(3, e.duration * 30)); // More trail for longer grains
 
                 particlesRef.current.push({
                     x: e.normPos,
                     width: normWidth,
                     life: 1.0,
                     decay: decay,
-                    color: color
+                    color: color,
+                    trail: [e.normPos],
+                    pan: e.pan,
+                    duration: e.duration
                 });
             });
         }
@@ -161,15 +170,55 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         for (let i = particlesRef.current.length - 1; i >= 0; i--) {
             const p = particlesRef.current[i];
 
-            // Draw
+            // Calculate size based on grain duration (larger grains = bigger particles)
+            const baseSize = Math.max(3, Math.min(20, p.duration * 40));
+            const sizeMultiplier = 0.8 + (p.duration * 0.4); // 0.8 to 1.2x based on duration
+            const pw = Math.max(3, p.width * width * sizeMultiplier);
             const px = p.x * width;
-            const pw = Math.max(2, p.width * width);
-            const alpha = p.life * 0.6;
 
+            // Add glow effect for high-life particles
+            if (p.life > 0.5) {
+                ctx.shadowColor = p.color.replace('rgba', 'rgb').replace(',', '').replace(',', '').replace(',', '') + ',';
+                ctx.shadowColor = p.color + ' 1)';
+                ctx.shadowBlur = 15 * p.life;
+            }
+
+            // Draw trail (fading previous positions)
+            if (p.trail.length > 1) {
+                for (let j = 0; j < p.trail.length; j++) {
+                    const trailAlpha = (j / p.trail.length) * 0.3 * p.life;
+                    const trailX = p.trail[j] * width;
+                    const trailWidth = pw * (j / p.trail.length); // Tapering trail
+
+                    ctx.fillStyle = `${p.color} ${trailAlpha})`;
+                    ctx.fillRect(trailX - trailWidth / 2, height / 2 - baseSize / 2, trailWidth, baseSize);
+                }
+            }
+
+            // Draw main particle with glow
+            const alpha = p.life * 0.7;
             ctx.fillStyle = `${p.color} ${alpha})`;
-            ctx.fillRect(px, 0, pw, height);
 
-            // Update
+            // Draw as a rounded rectangle for softer appearance
+            const radius = baseSize / 2;
+            const py = height / 2 - radius;
+
+            ctx.beginPath();
+            ctx.roundRect(px - pw / 2, py, pw, baseSize, radius);
+            ctx.fill();
+
+            // Reset shadow
+            ctx.shadowBlur = 0;
+
+            // Update: add current position to trail
+            if (p.trail.length < 15) {
+                p.trail.push(p.x);
+            } else {
+                p.trail.shift();
+                p.trail.push(p.x);
+            }
+
+            // Decay life
             p.life -= p.decay;
             if (p.life <= 0) {
                 particlesRef.current.splice(i, 1);
