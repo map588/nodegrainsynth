@@ -171,16 +171,16 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
             const p = particlesRef.current[i];
 
             // Calculate size based on grain duration (larger grains = bigger particles)
-            const baseSize = Math.max(3, Math.min(20, p.duration * 40));
-            const sizeMultiplier = 0.8 + (p.duration * 0.4); // 0.8 to 1.2x based on duration
-            const pw = Math.max(3, p.width * width * sizeMultiplier);
+            const baseSize = Math.max(6, Math.min(35, p.duration * 60));
+            const sizeMultiplier = 1.0 + (p.duration * 0.6); // 1.0 to 1.6x based on duration
+            const pw = Math.max(5, p.width * width * sizeMultiplier);
             const px = p.x * width;
 
             // Add glow effect for high-life particles
-            if (p.life > 0.5) {
+            if (p.life > 0.3) {
                 ctx.shadowColor = p.color.replace('rgba', 'rgb').replace(',', '').replace(',', '').replace(',', '') + ',';
                 ctx.shadowColor = p.color + ' 1)';
-                ctx.shadowBlur = 15 * p.life;
+                ctx.shadowBlur = 25 * p.life;
             }
 
             // Draw trail (fading previous positions)
