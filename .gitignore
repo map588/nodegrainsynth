@@ -33,3 +33,6 @@ dist-ssr
 
 # AI metadata
 metadata.json
+
+# Documentation (keep locally, not on GitHub)
+CLAUDE.md
