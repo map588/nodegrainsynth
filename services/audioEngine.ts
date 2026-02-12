@@ -36,6 +36,14 @@ export class AudioEngine {
   // Visualization
   private grainQueue: GrainEvent[] = [];
 
+  // Performance: Reusable analyzer arrays (zero-allocation)
+  private frequencyDataArray: Uint8Array | null = null;
+  private timeDataArray: Float32Array | null = null;
+
+  // Performance: Distortion curve cache
+  private distortionCurveCache: Map<number, Float32Array> = new Map();
+  private static readonly MAX_DISTORTION_CACHE = 20;
+
   // Recording
   private mediaRecorder: MediaRecorder | null = null;
   private recordedChunks: Blob[] = [];
@@ -71,6 +79,11 @@ export class AudioEngine {
       // Analyser setup
       this.analyser.fftSize = 2048;
       this.analyser.smoothingTimeConstant = 0.8;
+
+      // Initialize reusable analyzer arrays (zero-allocation for getFrequencyData/getTimeData)
+      const fftSize = this.analyser.frequencyBinCount;
+      this.frequencyDataArray = new Uint8Array(fftSize);
+      this.timeDataArray = new Float32Array(fftSize);
       
       this.delayNode = this.ctx.createDelay(5.0);
       this.delayFeedbackNode = this.ctx.createGain();
@@ -241,25 +254,33 @@ export class AudioEngine {
   }
 
   getFrequencyData(): Uint8Array | null {
-      if (!this.analyser) return null;
-      const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-      this.analyser.getByteFrequencyData(dataArray);
-      return dataArray;
+      if (!this.analyser || !this.frequencyDataArray) return null;
+      this.analyser.getByteFrequencyData(this.frequencyDataArray);
+      return this.frequencyDataArray;
   }
 
   getTimeData(): Float32Array | null {
-      if (!this.analyser) return null;
-      const dataArray = new Float32Array(this.analyser.frequencyBinCount);
-      this.analyser.getFloatTimeDomainData(dataArray);
-      return dataArray;
+      if (!this.analyser || !this.timeDataArray) return null;
+      this.analyser.getFloatTimeDomainData(this.timeDataArray);
+      return this.timeDataArray;
   }
 
   private makeDistortionCurve(amount: number): Float32Array {
+    // Round to 3 decimal places for cache key (precision enough for audio)
+    const cacheKey = Math.round(amount * 1000) / 1000;
+
+    // Check cache first
+    const cached = this.distortionCurveCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Not in cache, create new curve
     const k = amount * 100;
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    
+
     if (amount === 0) {
         for (let i = 0; i < n_samples; ++i) {
             const x = (i * 2) / n_samples - 1;
@@ -271,6 +292,14 @@ export class AudioEngine {
             curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
         }
     }
+
+    // Cache the curve (remove oldest if cache full)
+    if (this.distortionCurveCache.size >= AudioEngine.MAX_DISTORTION_CACHE) {
+      const firstKey = this.distortionCurveCache.keys().next().value;
+      this.distortionCurveCache.delete(firstKey);
+    }
+    this.distortionCurveCache.set(cacheKey, curve);
+
     return curve;
   }
 
