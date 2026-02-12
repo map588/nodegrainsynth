@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { GranularParams, ThemeColors } from '../types';
 import { AudioEngine } from '../services/audioEngine';
@@ -25,6 +25,7 @@ interface Particle {
     trail: number[]; // previous positions for trail effect
     pan: number; // pan position -1 to 1
     duration: number; // grain duration in seconds
+    alive: boolean; // for pooling: whether particle is in use
 }
 
 export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
@@ -49,12 +50,44 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
   // Particles for visualization
   const particlesRef = useRef<Particle[]>([]);
 
+  // Particle pool for zero-allocation (200 pre-allocated particles)
+  const particlePoolRef = useRef<Particle[]>([]);
+  const freeParticlesRef = useRef<number[]>([]); // indices of free particles
+  const activeParticlesRef = useRef<Set<number>>(new Set()); // indices of active particles
+  const MAX_PARTICLES = 200;
+
   // Animation frame ref
   const rafRef = useRef<number | null>(null);
 
   // XY Pad state
   const [xyPadPosition, setXyPadPosition] = useState<{ x: number; y: number } | null>(null);
   const [isXyPadDragging, setIsXyPadDragging] = useState(false);
+
+  // Initialize particle pool on mount (zero-allocation for particles)
+  useEffect(() => {
+    // Pre-allocate all particles
+    const pool: Particle[] = [];
+    const freeIndices: number[] = [];
+
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      pool.push({
+        x: 0,
+        width: 0,
+        life: 0,
+        decay: 0,
+        color: '',
+        trail: [],
+        pan: 0,
+        duration: 0,
+        alive: false
+      });
+      freeIndices.push(i);
+    }
+
+    particlePoolRef.current = pool;
+    freeParticlesRef.current = freeIndices;
+    activeParticlesRef.current.clear();
+  }, []); // Run once on mount
 
   // 1. Prepare offscreen waveform when data changes
   useEffect(() => {
@@ -119,6 +152,34 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
 
   }, [data, colors]); // Redraw when data or colors change
 
+  // Helper: Acquire particle from pool (returns null if pool exhausted)
+  const acquireParticle = useCallback((data: {
+    x: number; width: number; life: number; decay: number; color: string; trail: number[]; pan: number; duration: number;
+  }): Particle | null => {
+    const freeIdx = freeParticlesRef.current.pop();
+    if (freeIdx === undefined) return null; // Pool exhausted
+
+    const p = particlePoolRef.current[freeIdx];
+    p.x = data.x;
+    p.width = data.width;
+    p.life = data.life;
+    p.decay = data.decay;
+    p.color = data.color;
+    p.trail = data.trail;
+    p.pan = data.pan;
+    p.duration = data.duration;
+    p.alive = true;
+
+    activeParticlesRef.current.add(freeIdx);
+    return p;
+  }, []);
+
+  // Helper: Release particle back to pool
+  const releaseParticle = useCallback((index: number) => {
+    activeParticlesRef.current.delete(index);
+    freeParticlesRef.current.push(index);
+    particlePoolRef.current[index].alive = false;
+  }, []);
 
   // 2. Animation Loop
   useEffect(() => {
@@ -150,7 +211,7 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
             const events = audioEngine.pollGrainEvents();
             const bufferDur = audioEngine.getBufferDuration();
 
-            events.forEach(e => {
+            for (const e of events) {
                 const normWidth = bufferDur > 0 ? (e.duration / bufferDur) : 0.01;
                 const decay = 1 / (Math.max(0.1, e.duration) * 60);
 
@@ -165,7 +226,8 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
                 // Initialize trail with starting position
                 const trailLength = Math.floor(Math.max(3, e.duration * 30)); // More trail for longer grains
 
-                particlesRef.current.push({
+                // Acquire from particle pool (returns null if exhausted)
+                const p = acquireParticle({
                     x: e.normPos,
                     width: normWidth,
                     life: 1.0,
@@ -175,14 +237,24 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
                     pan: e.pan,
                     duration: e.duration
                 });
-            });
+
+                if (!p) {
+                    // Pool exhausted, skip this grain (rare with 200 particles)
+                    continue;
+                }
+            }
         }
 
         // 3. Update and Draw Particles
         ctx.globalCompositeOperation = 'lighter';
 
-        for (let i = particlesRef.current.length - 1; i >= 0; i--) {
-            const p = particlesRef.current[i];
+        // Track dead particle indices to release after loop
+        const deadIndices: number[] = [];
+
+        // Iterate through active particles
+        for (const idx of activeParticlesRef.current) {
+            const p = particlePoolRef.current[idx];
+            if (!p.alive) continue; // Safety check
 
             // Calculate size based on grain duration (larger grains = bigger particles)
             const baseSize = Math.max(6, Math.min(35, p.duration * 60));
@@ -235,8 +307,13 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
             // Decay life
             p.life -= p.decay;
             if (p.life <= 0) {
-                particlesRef.current.splice(i, 1);
+                deadIndices.push(idx);
             }
+        }
+
+        // Release dead particles back to pool
+        for (const idx of deadIndices) {
+            releaseParticle(idx);
         }
 
         ctx.globalCompositeOperation = 'source-over';

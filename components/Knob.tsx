@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { ThemeColors } from '../types';
 import { DoubleTapDetector, MIN_TOUCH_TARGET } from '../utils/touch';
 
@@ -23,7 +23,7 @@ interface KnobProps {
   defaultValue?: number;
 }
 
-export const Knob: React.FC<KnobProps> = ({
+const KnobComponent: React.FC<KnobProps> = ({
   label,
   value,
   min,
@@ -271,3 +271,17 @@ export const Knob: React.FC<KnobProps> = ({
     </div>
   );
 };
+
+// Custom memo comparison to only re-render when visual props change
+const arePropsEqual = (prevProps: KnobProps, nextProps: KnobProps) => {
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.modulatedValue === nextProps.modulatedValue &&
+    prevProps.isMapping === nextProps.isMapping &&
+    prevProps.isTargeted === nextProps.isTargeted &&
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.colors === nextProps.colors
+  );
+};
+
+export const Knob = memo(KnobComponent, arePropsEqual);
