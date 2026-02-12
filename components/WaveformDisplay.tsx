@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { FolderOpen } from 'lucide-react';
 import { GranularParams, ThemeColors } from '../types';
 import { AudioEngine } from '../services/audioEngine';
 
@@ -12,6 +13,7 @@ interface WaveformDisplayProps {
   isDrifting?: boolean;
   xyPadMode?: boolean;
   onXyPadChange?: (x: number, y: number) => void;
+  onFileDrop?: (file: File) => void;
 }
 
 interface Particle {
@@ -34,8 +36,10 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     isFrozen = false,
     isDrifting = false,
     xyPadMode = false,
-    onXyPadChange
+    onXyPadChange,
+    onFileDrop,
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -77,8 +81,9 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     ctx.strokeStyle = colors.waveGrid;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for(let i=1; i<10; i++) {
-        const x = (width/10) * i;
+    const gridDivisions = 10;
+    for (let i = 0; i <= gridDivisions; i++) {
+        const x = (width / gridDivisions) * i;
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
     }
@@ -89,23 +94,30 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     ctx.strokeStyle = colors.waveLine;
     ctx.lineWidth = 1;
 
-    const step = Math.ceil(data.length / width);
+    const step = Math.max(1, Math.ceil(data.length / width));
     const amp = height / 2;
 
     for (let i = 0; i < width; i++) {
-      let min = 1.0;
-      let max = -1.0;
-      for (let j = 0; j < step; j++) {
-        const datum = data[(i * step) + j];
-        if (datum < min) min = datum;
-        if (datum > max) max = datum;
-      }
-      ctx.moveTo(i, (1 + min) * amp);
-      ctx.lineTo(i, (1 + max) * amp);
+        const sampleIndex = Math.floor((i / width) * data.length);
+
+        let min = 1.0;
+        let max = -1.0;
+
+        for (let j = 0; j < step; j++) {
+            const idx = sampleIndex + j;
+            if (idx >= 0 && idx < data.length) {
+                const datum = data[idx];
+                if (datum < min) min = datum;
+                if (datum > max) max = datum;
+            }
+        }
+
+        ctx.moveTo(i, (1 + min) * amp);
+        ctx.lineTo(i, (1 + max) * amp);
     }
     ctx.stroke();
 
-  }, [data, colors]); // Redraw when data OR colors change
+  }, [data, colors]); // Redraw when data or colors change
 
 
   // 2. Animation Loop
@@ -119,19 +131,21 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         const width = canvas.width;
         const height = canvas.height;
 
-        // 1. Draw Base Waveform (from cache or empty)
+        // Clear and draw background
+        ctx.fillStyle = colors.waveBg;
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw Base Waveform (from cache or empty)
         if (offscreenRef.current && data) {
             ctx.drawImage(offscreenRef.current, 0, 0);
         } else {
-            ctx.fillStyle = colors.waveBg;
-            ctx.fillRect(0, 0, width, height);
             ctx.font = '12px monospace';
             ctx.fillStyle = colors.waveText;
             ctx.textAlign = 'center';
             ctx.fillText("NO SAMPLE LOADED", width/2, height/2);
         }
 
-        // 2. Poll and Spawn Particles
+        // Poll and Spawn Particles
         if (audioEngine) {
             const events = audioEngine.pollGrainEvents();
             const bufferDur = audioEngine.getBufferDuration();
@@ -301,6 +315,49 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       setIsXyPadDragging(false);
   }
 
+  // Touch handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      if (xyPadMode && onXyPadChange) {
+        setIsXyPadDragging(true);
+        handleTouchXyPadMove(e);
+      } else {
+        handleTouchSeek(e);
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      if (isXyPadDragging && xyPadMode && onXyPadChange) {
+        handleTouchXyPadMove(e);
+      } else if (!xyPadMode) {
+        handleTouchSeek(e);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsXyPadDragging(false);
+  };
+
+  const handleTouchSeek = (e: React.TouchEvent) => {
+    if (!containerRef.current || e.touches.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left;
+    const normalized = Math.max(0, Math.min(1, x / rect.width));
+    onSeek(normalized);
+  };
+
+  const handleTouchXyPadMove = (e: React.TouchEvent) => {
+    if (!containerRef.current || !onXyPadChange || e.touches.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, 1 - (e.touches[0].clientY - rect.top) / rect.height)); // Invert Y so up is higher
+    setXyPadPosition({ x, y });
+    onXyPadChange(x, y);
+  };
+
   const handleSeek = (e: React.MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
@@ -318,15 +375,57 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       onXyPadChange(x, y);
   }
 
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onFileDrop) {
+          setIsDragging(true);
+      }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      if (!onFileDrop) return;
+
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+          const file = files[0];
+          if (file.type.startsWith('audio/')) {
+              onFileDrop(file);
+          }
+      }
+  };
+
   return (
     <div
         ref={containerRef}
-        className={`relative w-full h-32 border-2 rounded-md overflow-hidden shadow-inner transition-colors duration-200 ${xyPadMode ? 'cursor-crosshair' : 'cursor-crosshair'}`}
-        style={{ backgroundColor: colors.waveBg, borderColor: xyPadMode ? '#22d3ee' : colors.moduleBorder }}
+        className="relative w-full h-32 border-2 rounded-md overflow-hidden shadow-inner transition-colors duration-200 cursor-crosshair"
+        style={{
+            backgroundColor: colors.waveBg,
+            borderColor: isDragging ? '#22c55e' : (xyPadMode ? '#22d3ee' : colors.moduleBorder),
+            borderWidth: isDragging ? '3px' : '2px',
+            touchAction: 'none'
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
     >
       <canvas
         ref={canvasRef}
@@ -337,6 +436,16 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       <div className="absolute top-1 left-2 text-[10px] font-mono pointer-events-none" style={{ color: colors.waveText }}>
         00:00.000
       </div>
+
+      {/* Drag overlay */}
+      {isDragging && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
+              <div className="text-center">
+                  <FolderOpen size={32} className="mx-auto mb-2 text-green-400" />
+                  <div className="text-green-400 font-bold text-sm">Drop Audio File Here</div>
+              </div>
+          </div>
+      )}
 
       {/* XY Pad Overlay */}
       {xyPadMode && (

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ThemeColors } from '../types';
+import { DoubleTapDetector, MIN_TOUCH_TARGET } from '../utils/touch';
 
 interface KnobProps {
   label: string;
@@ -46,14 +47,36 @@ export const Knob: React.FC<KnobProps> = ({
   const [internalValue, setInternalValue] = useState(value);
   const startY = useRef<number>(0);
   const startVal = useRef<number>(0);
+  const doubleTapRef = useRef(new DoubleTapDetector(300));
 
   // Sync internal value if props change externally
   useEffect(() => {
     setInternalValue(value);
   }, [value]);
 
+  // Handle double-tap/double-click reset
+  const handleReset = useCallback(() => {
+    if (disabled) return;
+    if (onReset) {
+      onReset();
+      return;
+    }
+    if (defaultValue !== undefined) {
+      setInternalValue(defaultValue);
+      onChange(defaultValue);
+      onDragEnd?.(defaultValue);
+    }
+  }, [disabled, onReset, defaultValue, onChange, onDragEnd]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (disabled) return;
+
+    // Check for double-click
+    if (doubleTapRef.current.checkTap()) {
+      handleReset();
+      return;
+    }
+
     if (isMapping) {
         e.preventDefault();
         onToggleTarget?.();
@@ -67,16 +90,32 @@ export const Knob: React.FC<KnobProps> = ({
     onDragStart?.();
   };
 
-  const handleDoubleClick = () => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     if (disabled) return;
-    if (onReset) {
-      onReset();
+
+    // Check for double-tap
+    if (doubleTapRef.current.checkTap()) {
+      handleReset();
       return;
     }
-    if (!defaultValue) return;
-    setInternalValue(defaultValue);
-    onChange(defaultValue);
-    onDragEnd?.(defaultValue);
+
+    if (isMapping) {
+      e.preventDefault();
+      onToggleTarget?.();
+      return;
+    }
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    setIsDragging(true);
+    startY.current = touch.clientY;
+    startVal.current = internalValue;
+    onDragStart?.();
+  };
+
+  const handleDoubleClick = () => {
+    handleReset();
   };
 
   useEffect(() => {
@@ -101,7 +140,30 @@ export const Knob: React.FC<KnobProps> = ({
       onChange(newValue);
     };
 
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging) return;
+
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const deltaY = startY.current - touch.clientY;
+      const range = max - min;
+      const sensitivity = range / 200;
+
+      let newValue = startVal.current + deltaY * sensitivity;
+      newValue = Math.max(min, Math.min(max, newValue));
+
+      if (integer) {
+        newValue = Math.round(newValue);
+      } else if (step) {
+          newValue = Math.round(newValue / step) * step;
+      }
+
+      setInternalValue(newValue);
+      onChange(newValue);
+    };
+
+    const handleEnd = () => {
       setIsDragging(false);
       document.body.style.cursor = 'default';
       onDragEnd?.(internalValue);
@@ -109,12 +171,18 @@ export const Knob: React.FC<KnobProps> = ({
 
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleTouchMove, { passive: true });
+      window.addEventListener('touchend', handleEnd);
+      window.addEventListener('touchcancel', handleEnd);
     }
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     };
   }, [isDragging, max, min, onChange, step, integer, internalValue, onDragEnd]);
 
@@ -145,10 +213,11 @@ export const Knob: React.FC<KnobProps> = ({
     <div className={`flex flex-col items-center gap-1 w-16 ${mappingOpacity} ${disabledOpacity}`} style={{ userSelect: 'none' }}>
       {/* Knob SVG */}
       <div
-        className={`relative w-12 h-12 ${disabled ? 'cursor-not-allowed' : mappingCursor} group`}
+        className={`relative w-14 h-14 md:w-12 md:h-12 ${disabled ? 'cursor-not-allowed' : mappingCursor} group`}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         onDoubleClick={handleDoubleClick}
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: 'none', touchAction: 'none', minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
       >
         <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
             {/* Background Track */}

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, FolderOpen, Volume2, VolumeX, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee } from 'lucide-react';
+import { Play, Pause, FolderOpen, Volume2, VolumeX, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee, Smartphone, Monitor } from 'lucide-react';
 import { GranularParams, DEFAULT_PARAMS, LfoShape, EnvelopeCurve, ThemeColors, FACTORY_PRESETS, Preset, ScaleType, SCALE_INTERVALS, snapPitchToScale, TextureProfileType, TEXTURE_PROFILES, randomizeTextureProfile } from './types';
 import { AudioEngine } from './services/audioEngine';
+import { BUILTIN_SAMPLES } from './services/builtinSamples';
 import { Knob } from './components/Knob';
 import { WaveformDisplay } from './components/WaveformDisplay';
+import { MIN_TOUCH_TARGET } from './utils/touch';
 
 // Scales matching the Audio Engine modulation logic
 const MOD_SCALES: Record<string, number> = {
@@ -106,6 +108,8 @@ export const App: React.FC = () => {
   const [showCpuMeter, setShowCpuMeter] = useState(false);
   const [fps, setFps] = useState(60);
   const [frameTime, setFrameTime] = useState(0);
+  const [selectedBuiltinSample, setSelectedBuiltinSample] = useState<string>("");
+  const [isMobileMode, setIsMobileMode] = useState(false);
 
   // Undo/Redo history
   const [history, setHistory] = useState<GranularParams[]>([DEFAULT_PARAMS]);
@@ -399,7 +403,8 @@ export const App: React.FC = () => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `nodegrain_recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+              const extension = blob.type.includes('wav') ? 'wav' : 'webm';
+              a.download = `nodegrain_recording_${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
@@ -421,12 +426,34 @@ export const App: React.FC = () => {
         // Pause while loading
         const wasPlaying = isPlaying;
         if(wasPlaying) engineRef.current.stop();
-        
+
         await engineRef.current.loadSample(file);
         setAudioData(engineRef.current.getAudioData());
-        
+
         if(wasPlaying) engineRef.current.start();
     }
+  };
+
+  const handleLoadBuiltinSample = async (sampleName: string) => {
+    if (!sampleName || !engineRef.current) return;
+
+    const sample = BUILTIN_SAMPLES.find(s => s.name === sampleName);
+    if (!sample) return;
+
+    setSelectedBuiltinSample(sampleName);
+    setFileName(sample.name);
+
+    // Pause while loading
+    const wasPlaying = isPlaying;
+    if (wasPlaying) engineRef.current.stop();
+
+    // Generate the sample data
+    await engineRef.current.init();
+    const sampleData = sample.generate(engineRef.current.getCurrentTime() as any, 3.0);
+    engineRef.current.loadFromFloat32Data(sampleData);
+    setAudioData(engineRef.current.getAudioData());
+
+    if (wasPlaying) engineRef.current.start();
   };
 
   const handleLfoRandomize = () => {
@@ -642,9 +669,28 @@ export const App: React.FC = () => {
       return Math.max(min, Math.min(max, val));
   };
 
+  // Envelope preset handlers
+  const handleEnvelopePreset = (attack: number, release: number, curve: EnvelopeCurve) => {
+      const newParams = { ...params, attack, release, envelopeCurve: curve };
+      setParams(newParams);
+      engineRef.current?.updateParams(newParams);
+      setCurrentPresetName(prev => prev.endsWith('*') ? prev : prev + '*');
+  };
+
+  // LFO preset handlers
+  const handleLfoPreset = (rate: number, amount: number, shape?: LfoShape) => {
+      const newParams = { ...params, lfoRate: rate, lfoAmount: amount };
+      if (shape) {
+          newParams.lfoShape = shape;
+      }
+      setParams(newParams);
+      engineRef.current?.updateParams(newParams);
+      setCurrentPresetName(prev => prev.endsWith('*') ? prev : prev + '*');
+  };
+
   return (
     <div
-        className="min-h-screen flex items-center justify-center p-4 overflow-auto relative"
+        className={`min-h-screen flex items-center justify-center ${isMobileMode ? 'p-2' : 'p-4'} overflow-x-hidden overflow-y-auto relative`}
         style={{
             backgroundColor: colors.bg,
             backgroundImage: theme === 'dark'
@@ -704,7 +750,7 @@ export const App: React.FC = () => {
 
       {/* Main Rack Container */}
       <div
-        className="w-fit rounded-lg p-1 shadow-2xl border transition-colors duration-300 relative z-10"
+        className={`${isMobileMode ? 'w-full max-w-[1800px]' : 'w-fit'} mx-auto rounded-lg p-1 shadow-2xl border transition-colors duration-300 relative z-10`}
         style={{
             backgroundColor: colors.rack,
             borderColor: colors.rackBorder,
@@ -729,51 +775,56 @@ export const App: React.FC = () => {
                 <div className="w-3 h-3 rounded-full bg-green-500 border border-green-700 shadow-sm"></div>
                 <h1 className={`font-bold text-sm tracking-wide ${colors.headerText}`}>NODEGRAIN</h1>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-1 md:gap-2 items-center">
                  <button
                      onClick={handleUndo}
                      disabled={!canUndo}
-                     className={`${colors.headerText} ${canUndo ? 'opacity-70 hover:opacity-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'} transition-opacity`}
+                     className={`${colors.headerText} ${canUndo ? 'opacity-70 hover:opacity-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'} transition-opacity flex items-center justify-center`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title="Undo"
                  >
-                     <Undo size={14}/>
+                     <Undo size={16} className="md:w-3.5 md:h-3.5"/>
                  </button>
                  <button
                      onClick={handleRedo}
                      disabled={!canRedo}
-                     className={`${colors.headerText} ${canRedo ? 'opacity-70 hover:opacity-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'} transition-opacity`}
+                     className={`${colors.headerText} ${canRedo ? 'opacity-70 hover:opacity-100 cursor-pointer' : 'opacity-30 cursor-not-allowed'} transition-opacity flex items-center justify-center`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title="Redo"
                  >
-                     <Redo size={14}/>
+                     <Redo size={16} className="md:w-3.5 md:h-3.5"/>
                  </button>
-                 <div className="w-[1px] h-4 bg-neutral-400 mx-1"></div>
+                 <div className="w-[1px] h-4 bg-neutral-400 mx-0.5 md:mx-1 hidden sm:block"></div>
                  <button
                      onClick={() => setShowHelp(true)}
-                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95`}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 flex items-center justify-center`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title="Help"
                  >
-                     <HelpCircle size={14}/>
+                     <HelpCircle size={16} className="md:w-3.5 md:h-3.5"/>
                  </button>
                  <a
                      href="https://www.buymeacoffee.com/rigs"
                      target="_blank"
                      rel="noopener noreferrer"
-                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 flex items-center gap-1 text-xs font-semibold`}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 flex items-center gap-1 text-xs font-semibold px-2 py-1 hidden md:flex`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title="Support me on Buy Me a Coffee"
                  >
                      <Coffee size={14}/>
-                     <span>Support Me</span>
+                     <span>Support</span>
                  </a>
-                 <div className="w-[1px] h-4 bg-neutral-400 mx-1"></div>
+                 <div className="w-[1px] h-4 bg-neutral-400 mx-0.5 md:mx-1 hidden sm:block"></div>
                  <button
                      onClick={(e) => {
                          e.stopPropagation();
                          setShowCpuMeter(!showCpuMeter);
                      }}
-                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 relative ${showCpuMeter ? 'text-green-400' : ''}`}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 relative ${showCpuMeter ? 'text-green-400' : ''} flex items-center justify-center`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title="CPU Meter"
                  >
-                     <Activity size={16}/>
+                     <Activity size={18} className="md:w-4 md:h-4"/>
                      {showCpuMeter && (
                          <div
                              onClick={(e) => e.stopPropagation()}
@@ -823,13 +874,26 @@ export const App: React.FC = () => {
                  </button>
                  <button
                      onClick={handleToggleMute}
-                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 ${isMuted ? 'text-red-400' : ''}`}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 ${isMuted ? 'text-red-400' : ''} flex items-center justify-center`}
+                     style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET }}
                      title={isMuted ? 'Unmute' : 'Mute'}
                  >
-                     {isMuted ? <VolumeX size={16}/> : <Volume2 size={16}/>}
+                     {isMuted ? <VolumeX size={18} className="md:w-4 md:h-4"/> : <Volume2 size={18} className="md:w-4 md:h-4"/>}
                  </button>
                  <div className="w-[1px] h-4 bg-neutral-400 mx-1"></div>
-                 <button onClick={toggleTheme} className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95`}>
+                 <button
+                     onClick={() => setIsMobileMode(!isMobileMode)}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 flex items-center justify-center ${isMobileMode ? 'text-cyan-400' : ''}`}
+                     style={{ minWidth: 28, minHeight: 28 }}
+                     title={isMobileMode ? 'Desktop Mode' : 'Mobile Mode'}
+                 >
+                     {isMobileMode ? <Monitor size={16} /> : <Smartphone size={16} />}
+                 </button>
+                 <button
+                     onClick={toggleTheme}
+                     className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 flex items-center justify-center`}
+                     style={{ minWidth: 28, minHeight: 28 }}
+                 >
                      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                  </button>
             </div>
@@ -899,36 +963,48 @@ export const App: React.FC = () => {
                     isDrifting={isDrifting}
                     xyPadMode={xyPadMode}
                     onXyPadChange={handleXyPadChange}
+                    onFileDrop={async (file) => {
+                        setFileName(file.name);
+                        const wasPlaying = isPlaying;
+                        if (wasPlaying) engineRef.current?.stop();
+
+                        await engineRef.current?.loadSample(file);
+                        setAudioData(engineRef.current?.getAudioData() || null);
+
+                        if (wasPlaying) engineRef.current?.start();
+                    }}
                 />
             </div>
 
             {/* Controls Grid */}
             <div className="flex gap-1 items-stretch">
-                
+
                 {/* Transport & Global */}
-                <div 
-                    className="border rounded-sm p-2 flex flex-col gap-2 w-28 shrink-0 items-center transition-colors duration-300"
+                <div
+                    className={`border rounded-sm p-2 flex flex-col gap-2 ${isMobileMode ? 'w-32' : 'w-28'} shrink-0 items-center transition-colors duration-300`}
                     style={{ backgroundColor: colors.moduleBg, borderColor: colors.moduleBorder }}
                 >
                     {/* Play/Stop */}
-                    <button 
+                    <button
                         onClick={togglePlay}
-                        className={`w-full py-2 rounded font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border shadow-sm transition-all
-                            ${isPlaying 
-                                ? 'bg-orange-500 border-orange-600 text-white' 
-                                : (theme === 'dark' 
-                                    ? 'bg-[#b8b8b8] border-[#888] text-neutral-800 hover:bg-[#c4c4c4]' 
+                        style={{ minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined }}
+                        className={`w-full ${isMobileMode ? 'py-3' : 'py-2'} rounded font-bold ${isMobileMode ? 'text-sm' : 'text-xs'} uppercase tracking-wider flex items-center justify-center gap-2 border shadow-sm transition-all
+                            ${isPlaying
+                                ? 'bg-orange-500 border-orange-600 text-white'
+                                : (theme === 'dark'
+                                    ? 'bg-[#b8b8b8] border-[#888] text-neutral-800 hover:bg-[#c4c4c4]'
                                     : 'bg-[#e4e4e7] border-[#d4d4d8] text-neutral-800 hover:bg-[#f4f4f5]')
                             }`}
                     >
-                        {isPlaying ? <Pause size={14} fill="currentColor"/> : <Play size={14} fill="currentColor"/>}
+                        {isPlaying ? <Pause size={isMobileMode ? 16 : 14} fill="currentColor"/> : <Play size={isMobileMode ? 16 : 14} fill="currentColor"/>}
                         {isPlaying ? 'HOLD' : 'PLAY'}
                     </button>
 
                     <button
                         onClick={handleRecordToggle}
                         title="Record output"
-                        className={`w-full py-1.5 border rounded font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all
+                        style={{ minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined }}
+                        className={`w-full ${isMobileMode ? 'py-3' : 'py-2'} border rounded font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all
                             ${isRecording
                                 ? 'bg-red-500 border-red-600 text-white animate-pulse'
                                 : (theme === 'dark'
@@ -936,52 +1012,76 @@ export const App: React.FC = () => {
                                     : 'bg-[#e4e4e7] border-[#d4d4d8] text-neutral-800 hover:bg-[#f4f4f5]')
                             }`}
                     >
-                        {isRecording
-                            ? <Circle size={12} fill="currentColor" className="animate-pulse"/>
-                            : <Circle size={12} fill="none" strokeWidth={2}/>
-                        }
+                        <Circle size={isMobileMode ? 16 : 14} fill={isRecording ? "currentColor" : "none"} strokeWidth={2}/>
                         {isRecording ? `REC ${formatTime(recordingTime)}` : 'REC'}
                     </button>
 
+                    {/* Built-in Samples */}
+                    <div className="w-full flex flex-col gap-1">
+                        <select
+                            value={selectedBuiltinSample}
+                            onChange={(e) => handleLoadBuiltinSample(e.target.value)}
+                            className={`w-full ${isMobileMode ? 'py-2 text-xs' : 'py-1 text-[10px]'} px-2 font-semibold border rounded cursor-pointer focus:outline-none`}
+                            style={{
+                                backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                                borderColor: colors.moduleBorder,
+                                color: theme === 'dark' ? '#fb923c' : '#ea580c',
+                                minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
+                            }}
+                        >
+                            <option value="">Built-in Samples...</option>
+                            <optgroup label="Pads">
+                                <option value="Ethereal Pad">Ethereal Pad</option>
+                                <option value="Glass Harmonics">Glass Harmonics</option>
+                                <option value="FM Bell">FM Bell</option>
+                            </optgroup>
+                            <optgroup label="Drones">
+                                <option value="Dark Drone">Dark Drone</option>
+                            </optgroup>
+                            <optgroup label="Textures">
+                                <option value="Granular Texture">Granular Texture</option>
+                                <option value="White Noise Wash">White Noise Wash</option>
+                            </optgroup>
+                            <optgroup label="Glitch">
+                                <option value="Digital Glitch">Digital Glitch</option>
+                            </optgroup>
+                            <optgroup label="Rhythmic">
+                                <option value="Rhythmic Pulse">Rhythmic Pulse</option>
+                            </optgroup>
+                            <optgroup label="FX">
+                                <option value="Sci-Fi FX">Sci-Fi FX</option>
+                                <option value="Sine Sweep">Sine Sweep</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
                     <label
-                        className="w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110"
+                        className={`w-full ${isMobileMode ? 'py-3' : 'py-2'} border rounded cursor-pointer flex items-center justify-center gap-2 font-semibold text-xs transition-colors hover:brightness-110`}
                         style={{
                             backgroundColor: colors.labelDefault,
                             borderColor: colors.moduleBorder,
-                            color: colors.labelTextDefault
+                            color: colors.labelTextDefault,
+                            minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
                         }}
                     >
-                        <FolderOpen size={14}/>
+                        <FolderOpen size={isMobileMode ? 16 : 14}/>
                         LOAD WAV
                         <input type="file" onChange={handleFileUpload} accept="audio/*" className="hidden"/>
                     </label>
 
-                    <button
-                        onClick={handleFullRandomize}
-                        title="Randomize All"
-                        className="w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110"
-                        style={{
-                            backgroundColor: colors.labelDefault,
-                            borderColor: colors.moduleBorder,
-                            color: colors.labelTextDefault
-                        }}
-                    >
-                        <Dices size={14}/>
-                        RANDOMIZE
-                    </button>
-
                     {/* Texture Profile Section */}
                     <div className="w-full h-[1px] bg-neutral-400/30 my-0.5"></div>
 
-                    <div className="w-full flex flex-col gap-1">
+                    <div className="w-full">
                         <select
                             value={textureProfile || ''}
                             onChange={(e) => handleTextureProfileChange(e.target.value as TextureProfileType | null)}
-                            className="w-full py-1 px-2 text-[10px] font-semibold border rounded cursor-pointer focus:outline-none"
+                            className={`w-full ${isMobileMode ? 'py-2 text-xs' : 'py-1 text-[10px]'} px-2 font-semibold border rounded cursor-pointer focus:outline-none`}
                             style={{
                                 backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff',
                                 borderColor: colors.moduleBorder,
-                                color: theme === 'dark' ? '#ffffff' : '#000000'
+                                color: theme === 'dark' ? '#ffffff' : '#000000',
+                                minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
                             }}
                         >
                             <option value="">Texture Profile...</option>
@@ -992,52 +1092,69 @@ export const App: React.FC = () => {
                             <option value="rhythmic">Rhythmic (Pattern)</option>
                             <option value="crystalline">Crystalline (Sparkle)</option>
                         </select>
-
-                        {textureProfile && (
-                            <button
-                                onClick={handleTextureProfileRandomize}
-                                title="Randomize within selected texture profile"
-                                className="w-full py-1 px-2 border rounded cursor-pointer flex items-center justify-center gap-1.5 text-[10px] font-semibold transition-colors hover:brightness-110"
-                                style={{
-                                    backgroundColor: colors.labelDefault,
-                                    borderColor: colors.moduleBorder,
-                                    color: colors.labelTextDefault
-                                }}
-                            >
-                                <Dices size={11}/>
-                                {TEXTURE_PROFILES[textureProfile].name.toUpperCase()}
-                            </button>
-                        )}
                     </div>
+
+                    {textureProfile && (
+                        <button
+                            onClick={handleTextureProfileRandomize}
+                            title="Randomize within selected texture profile"
+                            className={`w-full mt-1 ${isMobileMode ? 'py-2 text-xs' : 'py-1 text-[10px]'} px-2 border rounded cursor-pointer flex items-center justify-center gap-1.5 font-semibold transition-colors hover:brightness-110`}
+                            style={{
+                                backgroundColor: colors.labelDefault,
+                                borderColor: colors.moduleBorder,
+                                color: colors.labelTextDefault,
+                                minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
+                            }}
+                        >
+                            <Dices size={isMobileMode ? 12 : 10}/>
+                            {TEXTURE_PROFILES[textureProfile].name.toUpperCase()}
+                        </button>
+                    )}
 
                     <button
                         onClick={handleFreezeToggle}
                         title="Freeze grain position for ambient textures"
-                        className={`w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110
+                        className={`w-full ${isMobileMode ? 'py-3' : 'py-2'} border rounded cursor-pointer flex items-center justify-center gap-2 font-semibold text-xs transition-colors hover:brightness-110
                             ${isFrozen ? 'ring-2 ring-orange-400' : ''}`}
                         style={{
                             backgroundColor: isFrozen ? '#fb923c' : colors.labelDefault,
                             borderColor: colors.moduleBorder,
-                            color: isFrozen ? '#fff' : colors.labelTextDefault
+                            color: isFrozen ? '#fff' : colors.labelTextDefault,
+                            minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
                         }}
                     >
-                        <Snowflake size={14}/>
+                        <Snowflake size={isMobileMode ? 16 : 14}/>
                         {isFrozen ? 'UNFREEZE' : 'FREEZE'}
                     </button>
 
                     <button
                         onClick={handleDriftToggle}
                         title="Auto-drift position for organic textures"
-                        className={`w-full py-1.5 border rounded cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold transition-colors hover:brightness-110
+                        className={`w-full ${isMobileMode ? 'py-3' : 'py-2'} border rounded cursor-pointer flex items-center justify-center gap-2 font-semibold text-xs transition-colors hover:brightness-110
                             ${isDrifting ? 'ring-2 ring-cyan-400' : ''}`}
                         style={{
                             backgroundColor: isDrifting ? '#22d3ee' : colors.labelDefault,
                             borderColor: colors.moduleBorder,
-                            color: isDrifting ? '#000' : colors.labelTextDefault
+                            color: isDrifting ? '#000' : colors.labelTextDefault,
+                            minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
                         }}
                     >
-                        <Wind size={14}/>
+                        <Wind size={isMobileMode ? 16 : 14}/>
                         DRIFT
+                    </button>
+
+                    <button
+                        onClick={handleFullRandomize}
+                        title="Randomize All"
+                        className={`w-full mt-1 ${isMobileMode ? 'py-3' : 'py-2'} border rounded cursor-pointer flex items-center justify-center`}
+                        style={{
+                            backgroundColor: colors.labelDefault,
+                            borderColor: colors.moduleBorder,
+                            color: colors.labelTextDefault,
+                            minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
+                        }}
+                    >
+                        <Dices size={isMobileMode ? 20 : 18}/>
                     </button>
 
                     <div className="w-full h-[1px] bg-neutral-400/30 my-0.5"></div>
@@ -1045,14 +1162,15 @@ export const App: React.FC = () => {
                     {/* Presets */}
                     <div className="w-full flex flex-col gap-1.5">
                         <div className="relative w-full">
-                            <select 
-                                value={currentPresetName.replace('*', '')} 
+                            <select
+                                value={currentPresetName.replace('*', '')}
                                 onChange={handlePresetSelect}
-                                className="w-full text-[10px] py-1 px-1 rounded border appearance-none font-mono cursor-pointer outline-none focus:ring-1 focus:ring-orange-400"
-                                style={{ 
-                                    backgroundColor: colors.knobValueBg, 
+                                className={`w-full ${isMobileMode ? 'text-xs py-2' : 'text-[10px] py-1'} px-1 rounded border appearance-none font-mono cursor-pointer outline-none focus:ring-1 focus:ring-orange-400`}
+                                style={{
+                                    backgroundColor: colors.knobValueBg,
                                     color: theme === 'dark' ? '#fb923c' : '#ea580c',
-                                    borderColor: colors.moduleBorder 
+                                    borderColor: colors.moduleBorder,
+                                    minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined
                                 }}
                             >
                                 {FACTORY_PRESETS.map(p => (
@@ -1065,20 +1183,20 @@ export const App: React.FC = () => {
                         </div>
 
                         <div className="flex gap-1 w-full">
-                            <button 
+                            <button
                                 onClick={handleSavePreset}
                                 title="Save Preset"
-                                className="flex-1 py-1 rounded border flex items-center justify-center hover:brightness-110"
-                                style={{ backgroundColor: colors.knobBase, borderColor: colors.moduleBorder, color: colors.labelTextDefault }}
+                                className={`flex-1 ${isMobileMode ? 'py-2' : 'py-1'} rounded border flex items-center justify-center hover:brightness-110`}
+                                style={{ backgroundColor: colors.knobBase, borderColor: colors.moduleBorder, color: colors.labelTextDefault, minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined }}
                             >
-                                <Save size={12} />
+                                <Save size={isMobileMode ? 14 : 12} />
                             </button>
-                            <label 
+                            <label
                                 title="Load Preset"
-                                className="flex-1 py-1 rounded border flex items-center justify-center cursor-pointer hover:brightness-110"
-                                style={{ backgroundColor: colors.knobBase, borderColor: colors.moduleBorder, color: colors.labelTextDefault }}
+                                className={`flex-1 ${isMobileMode ? 'py-2' : 'py-1'} rounded border flex items-center justify-center cursor-pointer hover:brightness-110`}
+                                style={{ backgroundColor: colors.knobBase, borderColor: colors.moduleBorder, color: colors.labelTextDefault, minHeight: isMobileMode ? MIN_TOUCH_TARGET : undefined }}
                             >
-                                <Upload size={12} />
+                                <Upload size={isMobileMode ? 14 : 12} />
                                 <input type="file" accept=".json" onChange={handleLoadPresetFile} className="hidden" />
                             </label>
                         </div>
@@ -1388,7 +1506,7 @@ export const App: React.FC = () => {
                                 style={{ backgroundColor: colors.knobValueBg, borderColor: colors.moduleBorder }}
                             >
                             <button 
-                                className={`text-[9px] flex-1 py-0.5 rounded-sm font-bold transition-colors ${params.envelopeCurve === 'linear' ? 'bg-orange-500 text-black' : (colors.knobLabel + ' hover:opacity-100')}`}
+                                className={`text-[9px] flex-1 py-1 rounded-sm font-bold transition-colors ${params.envelopeCurve === 'linear' ? 'bg-orange-500 text-black' : (colors.knobLabel + ' hover:opacity-100')}`}
                                 onClick={() => handleParamChange('envelopeCurve', 'linear')}
                             >LIN</button>
                             <button 

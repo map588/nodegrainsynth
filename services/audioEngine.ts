@@ -156,10 +156,20 @@ export class AudioEngine {
       const nowBuff = buffer.getChannelData(channel);
       for (let i = 0; i < buffer.length; i++) {
         // Simple synth pad sound
-        nowBuff[i] = Math.sin(i * 0.01) * 0.5 + Math.random() * 0.1; 
+        nowBuff[i] = Math.sin(i * 0.01) * 0.5 + Math.random() * 0.1;
       }
     }
     this.buffer = buffer;
+  }
+
+  // Load audio from a Float32Array (for built-in samples)
+  loadFromFloat32Data(data: Float32Array): void {
+    if (!this.ctx) return;
+    const buffer = this.ctx.createBuffer(1, data.length, this.ctx.sampleRate);
+    buffer.copyToChannel(data, 0);
+    this.buffer = buffer;
+    // Reset position to start when loading new sample
+    this.params = { ...this.params, position: 0 };
   }
 
   start() {
@@ -234,6 +244,13 @@ export class AudioEngine {
       if (!this.analyser) return null;
       const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
       this.analyser.getByteFrequencyData(dataArray);
+      return dataArray;
+  }
+
+  getTimeData(): Float32Array | null {
+      if (!this.analyser) return null;
+      const dataArray = new Float32Array(this.analyser.frequencyBinCount);
+      this.analyser.getFloatTimeDomainData(dataArray);
       return dataArray;
   }
 
@@ -563,8 +580,27 @@ export class AudioEngine {
       this.masterGain.connect(dest);
 
       this.destinationStream = dest.stream;
-      this.mediaRecorder = new MediaRecorder(this.destinationStream);
       this.recordedChunks = [];
+
+      // Try to use WAV format, fallback to WebM
+      const mimeTypes = [
+          'audio/wav',
+          'audio/wav;codecs=pcm',
+          'audio/webm;codecs=pcm',
+          'audio/webm'
+      ];
+
+      let selectedMimeType = '';
+      for (const type of mimeTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+              selectedMimeType = type;
+              break;
+          }
+      }
+
+      this.mediaRecorder = new MediaRecorder(this.destinationStream, {
+          mimeType: selectedMimeType
+      });
 
       this.mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -580,8 +616,18 @@ export class AudioEngine {
       if (!this.mediaRecorder || !this.isRecording) return null;
 
       return new Promise((resolve) => {
-          this.mediaRecorder!.onstop = () => {
-              const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+          this.mediaRecorder!.onstop = async () => {
+              let blob: Blob;
+
+              if (this.recordedChunks[0]?.type.includes('wav')) {
+                  // Already WAV format
+                  blob = new Blob(this.recordedChunks, { type: 'audio/wav' });
+              } else {
+                  // Convert WebM to WAV
+                  const webmBlob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+                  blob = await this.convertWebMToWav(webmBlob);
+              }
+
               resolve(blob);
           };
 
@@ -594,6 +640,76 @@ export class AudioEngine {
               this.destinationStream = null;
           }
       });
+  }
+
+  // Convert WebM Blob to WAV format
+  private async convertWebMToWav(webmBlob: Blob): Promise<Blob> {
+      // Decode the WebM audio data
+      const arrayBuffer = await webmBlob.arrayBuffer();
+      const audioBuffer = await this.ctx!.decodeAudioData(arrayBuffer);
+
+      // Create WAV file
+      const wavBuffer = this.audioBufferToWav(audioBuffer);
+      return new Blob([wavBuffer], { type: 'audio/wav' });
+  }
+
+  // Convert AudioBuffer to WAV format (Float32 to Int16 PCM)
+  private audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+      const numChannels = buffer.numberOfChannels;
+      const sampleRate = buffer.sampleRate;
+      const format = 1; // PCM
+      const bitDepth = 16;
+
+      const bytesPerSample = bitDepth / 8;
+      const blockAlign = numChannels * bytesPerSample;
+
+      const data = [];
+      for (let i = 0; i < buffer.numberOfChannels; i++) {
+          data.push(buffer.getChannelData(i));
+      }
+
+      const interleaved = new Int16Array(data[0].length * numChannels);
+      for (let i = 0; i < data[0].length; i++) {
+          for (let channel = 0; channel < numChannels; channel++) {
+              const sample = Math.max(-1, Math.min(1, data[channel][i]));
+              interleaved[i * numChannels + channel] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+      }
+
+      const wavBuffer = new ArrayBuffer(44 + interleaved.length * 2);
+      const view = new DataView(wavBuffer);
+
+      // RIFF chunk descriptor
+      this.writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + interleaved.length * 2, true);
+      this.writeString(view, 8, 'WAVE');
+
+      // fmt sub-chunk
+      this.writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+      view.setUint16(20, format, true); // AudioFormat (1 for PCM)
+      view.setUint16(22, numChannels, true); // NumChannels
+      view.setUint32(24, sampleRate, true); // SampleRate
+      view.setUint32(28, sampleRate * blockAlign, true); // ByteRate
+      view.setUint16(32, blockAlign, true); // BlockAlign
+      view.setUint16(34, bitDepth, true); // BitsPerSample
+
+      // data sub-chunk
+      this.writeString(view, 36, 'data');
+      view.setUint32(40, interleaved.length * 2, true); // Subchunk2Size
+
+      // Write audio data
+      for (let i = 0; i < interleaved.length; i++) {
+          view.setInt16(44 + i * 2, interleaved[i], true);
+      }
+
+      return wavBuffer;
+  }
+
+  private writeString(view: DataView, offset: number, string: string): void {
+      for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+      }
   }
 
   isRecordingActive(): boolean {

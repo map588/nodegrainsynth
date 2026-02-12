@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
     <!-- SEO Meta Tags -->
     <title>NodeGrain - Free Web-Based Granular Synthesizer</title>
@@ -40,6 +40,36 @@
       body {
         margin: 0;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      /* Touch support styles */
+      button, select, input {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .touch-scroll {
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+      }
+      .no-touch-action {
+        touch-action: none;
+      }
+
+      /* Touch feedback for buttons */
+      @media (hover: none) and (pointer: coarse) {
+        button:active {
+          transform: scale(0.95);
+          opacity: 0.85;
+        }
+      }
+
+      /* Safe area insets for notched devices */
+      @supports (padding: env(safe-area-inset-top)) {
+        body {
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+          padding-bottom: env(safe-area-inset-bottom);
+        }
       }
     </style>
   <script type="importmap">
