@@ -265,6 +265,22 @@ export class AudioEngine {
       return this.timeDataArray;
   }
 
+  // Get output level (RMS) for VU meter (0-1 range)
+  getOutputLevel(): number {
+      if (!this.analyser || !this.timeDataArray) return 0;
+      this.analyser.getFloatTimeDomainData(this.timeDataArray);
+
+      // Calculate RMS (root mean square)
+      let sum = 0;
+      for (let i = 0; i < this.timeDataArray.length; i++) {
+          sum += this.timeDataArray[i] * this.timeDataArray[i];
+      }
+      const rms = Math.sqrt(sum / this.timeDataArray.length);
+
+      // Normalize to 0-1 range (approximate, RMS of 1.0 would be full scale)
+      return Math.min(1, rms * 2);
+  }
+
   private makeDistortionCurve(amount: number): Float32Array {
     // Round to 3 decimal places for cache key (precision enough for audio)
     const cacheKey = Math.round(amount * 1000) / 1000;

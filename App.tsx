@@ -108,6 +108,7 @@ export const App: React.FC = () => {
   const [showCpuMeter, setShowCpuMeter] = useState(false);
   const [fps, setFps] = useState(60);
   const [frameTime, setFrameTime] = useState(0);
+  const [outputLevel, setOutputLevel] = useState(0);
   const [selectedBuiltinSample, setSelectedBuiltinSample] = useState<string>("");
   const [isMobileMode, setIsMobileMode] = useState(false);
 
@@ -191,6 +192,24 @@ export const App: React.FC = () => {
     measureFps();
     return () => cancelAnimationFrame(frameId);
   }, []);
+
+  // VU Meter - poll output level
+  useEffect(() => {
+    let frameId: number;
+
+    const updateLevel = () => {
+      if (isPlaying && engineRef.current) {
+        const level = engineRef.current.getOutputLevel();
+        setOutputLevel(level);
+      } else {
+        setOutputLevel(0);
+      }
+      frameId = requestAnimationFrame(updateLevel);
+    };
+
+    updateLevel();
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying]);
 
   // Snap pitch to scale when harmonic lock is enabled or scale changes
   useEffect(() => {
@@ -714,60 +733,155 @@ export const App: React.FC = () => {
         className={`min-h-screen flex items-center justify-center ${isMobileMode ? 'p-2' : 'p-4'} overflow-x-hidden overflow-y-auto relative`}
         style={{
             backgroundColor: colors.bg,
-            backgroundImage: theme === 'dark'
-                ? `
-                    linear-gradient(rgba(30, 30, 30, 0.3) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(30, 30, 30, 0.3) 1px, transparent 1px)
-                `
-                : `
-                    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px)
-                `,
-            backgroundSize: '40px 40px, 40px 40px',
         }}
     >
-      {/* Animated background orbs - more visible */}
+      {/* Aurora Borealis Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Orange orb - top left */}
+        {/* Base dark gradient */}
         <div
-            className="absolute rounded-full blur-3xl animate-pulse"
+            className="absolute inset-0"
             style={{
-                width: '500px',
-                height: '500px',
-                background: 'radial-gradient(circle, rgba(251, 146, 60, 0.25) 0%, transparent 70%)',
-                top: '-100px',
-                left: '-100px',
-                animationDuration: '6s',
+                background: theme === 'dark'
+                    ? 'linear-gradient(180deg, #0a0a0a 0%, #0f1419 50%, #0a0a0a 100%)'
+                    : 'linear-gradient(180deg, #e5e5e5 0%, #d4d4d8 50%, #e5e5e5 100%)',
             }}
         />
-        {/* Cyan orb - bottom right */}
+
+        {/* Aurora layer 1 - Green waves */}
         <div
-            className="absolute rounded-full blur-3xl animate-pulse"
+            className="absolute w-[200%] h-full"
             style={{
-                width: '400px',
-                height: '400px',
-                background: 'radial-gradient(circle, rgba(34, 211, 238, 0.2) 0%, transparent 70%)',
-                bottom: '-80px',
-                right: '-80px',
-                animationDuration: '8s',
-                animationDelay: '1s',
+                top: '-20%',
+                left: '-50%',
+                background: theme === 'dark'
+                    ? `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 40% at 70% 30%, rgba(16, 185, 129, 0.12) 0%, transparent 50%)
+                    `
+                    : `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(34, 197, 94, 0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 40% at 70% 30%, rgba(16, 185, 129, 0.06) 0%, transparent 50%)
+                    `,
+                filter: 'blur(40px)',
+                animation: 'aurora1 25s ease-in-out infinite',
             }}
         />
-        {/* Pink orb - center */}
+
+        {/* Aurora layer 2 - Cyan/Teal waves */}
         <div
-            className="absolute rounded-full blur-3xl animate-pulse"
+            className="absolute w-[200%] h-full"
             style={{
-                width: '350px',
-                height: '350px',
-                background: 'radial-gradient(circle, rgba(232, 121, 249, 0.15) 0%, transparent 70%)',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                animationDuration: '7s',
-                animationDelay: '2s',
+                top: '-10%',
+                left: '-30%',
+                background: theme === 'dark'
+                    ? `
+                        radial-gradient(ellipse 70% 45% at 50% 20%, rgba(34, 211, 238, 0.12) 0%, transparent 50%),
+                        radial-gradient(ellipse 50% 35% at 30% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)
+                    `
+                    : `
+                        radial-gradient(ellipse 70% 45% at 50% 20%, rgba(34, 211, 238, 0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse 50% 35% at 30% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 50%)
+                    `,
+                filter: 'blur(50px)',
+                animation: 'aurora2 30s ease-in-out infinite',
+            }}
+        />
+
+        {/* Aurora layer 3 - Purple/Pink waves */}
+        <div
+            className="absolute w-[200%] h-full"
+            style={{
+                top: '0%',
+                left: '-40%',
+                background: theme === 'dark'
+                    ? `
+                        radial-gradient(ellipse 90% 40% at 80% 35%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 30% at 10% 25%, rgba(232, 121, 249, 0.08) 0%, transparent 50%)
+                    `
+                    : `
+                        radial-gradient(ellipse 90% 40% at 80% 35%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 30% at 10% 25%, rgba(232, 121, 249, 0.04) 0%, transparent 50%)
+                    `,
+                filter: 'blur(60px)',
+                animation: 'aurora3 35s ease-in-out infinite',
+            }}
+        />
+
+        {/* Aurora layer 4 - Subtle orange accent */}
+        <div
+            className="absolute w-[200%] h-full"
+            style={{
+                top: '-30%',
+                left: '-60%',
+                background: theme === 'dark'
+                    ? `radial-gradient(ellipse 50% 30% at 40% 60%, rgba(251, 146, 60, 0.08) 0%, transparent 50%)`
+                    : `radial-gradient(ellipse 50% 30% at 40% 60%, rgba(251, 146, 60, 0.04) 0%, transparent 50%)`,
+                filter: 'blur(70px)',
+                animation: 'aurora4 40s ease-in-out infinite',
+            }}
+        />
+
+        {/* Vertical curtain streaks - characteristic aurora feature */}
+        <div
+            className="absolute inset-0 opacity-30"
+            style={{
+                background: theme === 'dark'
+                    ? `
+                        repeating-linear-gradient(
+                            90deg,
+                            transparent 0px,
+                            transparent 80px,
+                            rgba(34, 197, 94, 0.03) 80px,
+                            rgba(34, 197, 94, 0.03) 82px,
+                            transparent 82px,
+                            transparent 150px,
+                            rgba(34, 211, 238, 0.02) 150px,
+                            rgba(34, 211, 238, 0.02) 152px
+                        )
+                    `
+                    : `
+                        repeating-linear-gradient(
+                            90deg,
+                            transparent 0px,
+                            transparent 80px,
+                            rgba(34, 197, 94, 0.015) 80px,
+                            rgba(34, 197, 94, 0.015) 82px,
+                            transparent 82px,
+                            transparent 150px,
+                            rgba(34, 211, 238, 0.01) 150px,
+                            rgba(34, 211, 238, 0.01) 152px
+                        )
+                    `,
+                animation: 'auroraCurtains 20s linear infinite',
             }}
         />
       </div>
+
+      {/* CSS Keyframes for Aurora Animations */}
+      <style>{`
+        @keyframes aurora1 {
+          0%, 100% { transform: translateX(0%) translateY(0%) scale(1); }
+          33% { transform: translateX(10%) translateY(-5%) scale(1.05); }
+          66% { transform: translateX(-5%) translateY(5%) scale(0.95); }
+        }
+        @keyframes aurora2 {
+          0%, 100% { transform: translateX(0%) translateY(0%) rotate(0deg); }
+          50% { transform: translateX(-15%) translateY(10%) rotate(2deg); }
+        }
+        @keyframes aurora3 {
+          0%, 100% { transform: translateX(0%) translateY(0%) scale(1); }
+          25% { transform: translateX(20%) translateY(-10%) scale(1.1); }
+          75% { transform: translateX(-10%) translateY(5%) scale(0.9); }
+        }
+        @keyframes aurora4 {
+          0%, 100% { transform: translateX(0%) translateY(0%); }
+          50% { transform: translateX(30%) translateY(-15%); }
+        }
+        @keyframes auroraCurtains {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(232px); }
+        }
+      `}</style>
 
       {/* Main Rack Container */}
       <div
@@ -893,6 +1007,24 @@ export const App: React.FC = () => {
                          </div>
                      )}
                  </button>
+                 {/* VU Meter */}
+                 <div
+                     className="flex items-center gap-1 px-2"
+                     title="Output Level"
+                 >
+                     <div
+                         className="w-16 h-3 rounded-sm overflow-hidden border"
+                         style={{ backgroundColor: colors.knobBase, borderColor: colors.moduleBorder }}
+                     >
+                         <div
+                             className="h-full transition-all duration-75 rounded-sm"
+                             style={{
+                                 width: `${outputLevel * 100}%`,
+                                 backgroundColor: outputLevel > 0.8 ? '#ef4444' : outputLevel > 0.5 ? '#eab308' : '#22c55e'
+                             }}
+                         />
+                     </div>
+                 </div>
                  <button
                      onClick={handleToggleMute}
                      className={`${colors.headerText} opacity-70 hover:opacity-100 transition-transform active:scale-95 ${isMuted ? 'text-red-400' : ''} flex items-center justify-center`}

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, memo } from 'react';
+import React, { useRef, useCallback, memo, useEffect } from 'react';
 import { ThemeColors } from '../types';
 
 interface KnobProps {
@@ -140,7 +140,7 @@ const KnobComponent: React.FC<KnobProps> = ({
   }, []);
 
   // Add global listeners only once on mount
-  React.useEffect(() => {
+  useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
