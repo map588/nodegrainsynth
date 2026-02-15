@@ -204,11 +204,37 @@ export const App: React.FC = () => {
     }
   }, [isHarmonicLockEnabled, scaleType]);
 
+  // Debounce timeout for history
+  const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref to always have access to current params in closures
+  const paramsRef = useRef<GranularParams>(params);
+  paramsRef.current = params;
+
   const handleParamChange = <K extends keyof GranularParams>(key: K, value: GranularParams[K]) => {
-    const newParams = { ...params, [key]: value };
+    // Always read from ref to get the LATEST params, not stale closure values
+    const currentParams = paramsRef.current;
+    const newParams = { ...currentParams, [key]: value };
 
     setParams(newParams);
     engineRef.current?.updateParams(newParams);
+
+    // Debounce history tracking - only save 100ms after last change
+    if (historyTimeoutRef.current) {
+      clearTimeout(historyTimeoutRef.current);
+    }
+    historyTimeoutRef.current = setTimeout(() => {
+      if (!isUndoingRef.current) {
+        const newHistory = history.slice(0, historyIndex + 1);
+        newHistory.push(newParams);
+        if (newHistory.length > 50) {
+          newHistory.shift();
+        }
+        setHistory(newHistory);
+        setHistoryIndex(Math.min(newHistory.length - 1, 49));
+      }
+    }, 100);
+
     // If user changes a param manually, we are no longer strictly on the preset
     if (currentPresetName && !currentPresetName.endsWith('*')) {
         setCurrentPresetName(prev => prev + "*");
@@ -279,12 +305,7 @@ export const App: React.FC = () => {
 
   // Helper to create knob handlers with history tracking
   const createKnobHandlers = <K extends keyof GranularParams>(key: K) => ({
-    onChange: (val: GranularParams[K]) => handleParamChange(key, val),
-    onDragStart: handleKnobDragStart,
-    onDragEnd: (val: GranularParams[K]) => {
-      const finalParams = { ...params, [key]: val };
-      handleKnobDragEnd(finalParams);
-    }
+    onChange: (val: GranularParams[K]) => handleParamChange(key, val)
   });
 
   // Helper to get locked pitch value (when harmonic lock is enabled)
@@ -1376,11 +1397,6 @@ export const App: React.FC = () => {
                             step={1}
                             integer
                             onChange={handlePitchChange}
-                            onDragStart={handleKnobDragStart}
-                            onDragEnd={(val) => {
-                                const finalParams = { ...params, pitch: val };
-                                handleKnobDragEnd(finalParams);
-                            }}
                             onReset={handlePitchReset}
                             unit="st"
                             isMapping={isMappingMode}
