@@ -820,41 +820,6 @@ export const App: React.FC = () => {
                 animation: 'aurora4 40s ease-in-out infinite',
             }}
         />
-
-        {/* Vertical curtain streaks - characteristic aurora feature */}
-        <div
-            className="absolute inset-0 opacity-30"
-            style={{
-                background: theme === 'dark'
-                    ? `
-                        repeating-linear-gradient(
-                            90deg,
-                            transparent 0px,
-                            transparent 80px,
-                            rgba(34, 197, 94, 0.03) 80px,
-                            rgba(34, 197, 94, 0.03) 82px,
-                            transparent 82px,
-                            transparent 150px,
-                            rgba(34, 211, 238, 0.02) 150px,
-                            rgba(34, 211, 238, 0.02) 152px
-                        )
-                    `
-                    : `
-                        repeating-linear-gradient(
-                            90deg,
-                            transparent 0px,
-                            transparent 80px,
-                            rgba(34, 197, 94, 0.015) 80px,
-                            rgba(34, 197, 94, 0.015) 82px,
-                            transparent 82px,
-                            transparent 150px,
-                            rgba(34, 211, 238, 0.01) 150px,
-                            rgba(34, 211, 238, 0.01) 152px
-                        )
-                    `,
-                animation: 'auroraCurtains 20s linear infinite',
-            }}
-        />
       </div>
 
       {/* CSS Keyframes for Aurora Animations */}
@@ -876,10 +841,6 @@ export const App: React.FC = () => {
         @keyframes aurora4 {
           0%, 100% { transform: translateX(0%) translateY(0%); }
           50% { transform: translateX(30%) translateY(-15%); }
-        }
-        @keyframes auroraCurtains {
-          0% { transform: translateX(0%); }
-          100% { transform: translateX(232px); }
         }
       `}</style>
 
