@@ -19,15 +19,23 @@ export class AudioEngine {
 
   // FX Nodes
   private distNode: WaveShaperNode | null = null;
-  
+
   private delayNode: DelayNode | null = null;
   private delayFeedbackNode: GainNode | null = null;
   private delayDryGain: GainNode | null = null;
   private delayWetGain: GainNode | null = null;
-  
+
   private reverbDryGain: GainNode | null = null;
   private reverbWetGain: GainNode | null = null;
   private convolver: ConvolverNode | null = null;
+
+  // Intermediate routing nodes
+  private preDelayNode: GainNode | null = null;
+  private preReverbNode: GainNode | null = null;
+
+  // FX Bypass states (track previous values to detect changes)
+  private lastDelayMix: number = -1;
+  private lastReverbMix: number = -1;
 
   private params: GranularParams;
   private nextGrainTime: number = 0;
@@ -101,30 +109,33 @@ export class AudioEngine {
       this.distNode.curve = this.makeDistortionCurve(0);
       this.distNode.oversample = '4x';
 
-      // Routing Graph:
-      // GrainSource -> Env -> Panner (New) -> Filter -> Distortion -> Delay -> Reverb -> Master
-      
-      // 1. Filter -> Distortion
-      this.filterNode.connect(this.distNode);
+      // Routing Graph (with dynamic bypass):
+      // GrainSource -> Env -> Panner -> Filter -> [Distortion] -> [Delay] -> [Reverb] -> Master
+      // Effects in [] can be bypassed when dry
 
-      // 2. Distortion -> Delay Section
-      // Delay topology: Input splits to Dry and Wet. Wet goes through Delay+Feedback.
-      this.distNode.connect(this.delayDryGain);
-      this.distNode.connect(this.delayNode);
-      
+      // Create intermediate routing nodes
+      this.preDelayNode = this.ctx.createGain();
+      this.preReverbNode = this.ctx.createGain();
+
+      // 1. Filter -> Distortion -> preDelayNode
+      this.filterNode.connect(this.distNode);
+      this.distNode.connect(this.preDelayNode);
+
+      // 2. Delay Section (connected to preDelayNode)
+      this.preDelayNode.connect(this.delayDryGain);
+      this.preDelayNode.connect(this.delayNode);
+
       this.delayNode.connect(this.delayFeedbackNode);
       this.delayFeedbackNode.connect(this.delayNode); // Feedback Loop
       this.delayNode.connect(this.delayWetGain);
 
-      // 3. Delay Output (Dry + Wet) -> Reverb Section
-      // We need an intermediate node to sum Delay Dry/Wet before sending to Reverb
-      const preReverbNode = this.ctx.createGain();
-      this.delayDryGain.connect(preReverbNode);
-      this.delayWetGain.connect(preReverbNode);
+      // 3. Delay Output -> preReverbNode
+      this.delayDryGain.connect(this.preReverbNode);
+      this.delayWetGain.connect(this.preReverbNode);
 
-      // 4. Reverb Section
-      preReverbNode.connect(this.reverbDryGain);
-      preReverbNode.connect(this.convolver);
+      // 4. Reverb Section (connected to preReverbNode)
+      this.preReverbNode.connect(this.reverbDryGain);
+      this.preReverbNode.connect(this.convolver);
       this.convolver.connect(this.reverbWetGain);
 
       // 5. To Master
@@ -223,16 +234,62 @@ export class AudioEngine {
         this.distNode.curve = this.makeDistortionCurve(this.params.distAmount);
     }
 
-    // Delay
-    if (this.delayNode && this.delayFeedbackNode && this.delayDryGain && this.delayWetGain) {
+    // Delay Bypass - reconnect when mix changes to/from 0
+    const delayBypassed = this.params.delayMix < 0.001;
+    const wasDelayBypassed = this.lastDelayMix < 0.001;
+
+    if (delayBypassed !== wasDelayBypassed && this.preDelayNode && this.preReverbNode) {
+      if (delayBypassed) {
+        // Bypass delay: connect preDelay directly to preReverb
+        try {
+          this.preDelayNode.disconnect(this.delayDryGain);
+          this.preDelayNode.disconnect(this.delayNode);
+        } catch (e) { /* ignore */ }
+        this.preDelayNode.connect(this.preReverbNode);
+      } else {
+        // Enable delay: restore normal routing
+        try {
+          this.preDelayNode.disconnect(this.preReverbNode);
+        } catch (e) { /* ignore */ }
+        this.preDelayNode.connect(this.delayDryGain);
+        this.preDelayNode.connect(this.delayNode);
+      }
+    }
+    this.lastDelayMix = this.params.delayMix;
+
+    // Delay parameters
+    if (this.delayNode && this.delayFeedbackNode && this.delayDryGain && this.delayWetGain && !delayBypassed) {
         this.delayNode.delayTime.setTargetAtTime(this.params.delayTime, t, ramp);
         this.delayFeedbackNode.gain.setTargetAtTime(this.params.delayFeedback, t, ramp);
         this.delayDryGain.gain.setTargetAtTime(1 - this.params.delayMix, t, ramp);
         this.delayWetGain.gain.setTargetAtTime(this.params.delayMix, t, ramp);
     }
 
-    // Reverb
-    if (this.reverbDryGain && this.reverbWetGain) {
+    // Reverb Bypass - reconnect when mix changes to/from 0
+    const reverbBypassed = this.params.reverbMix < 0.001;
+    const wasReverbBypassed = this.lastReverbMix < 0.001;
+
+    if (reverbBypassed !== wasReverbBypassed && this.preReverbNode && this.masterGain) {
+      if (reverbBypassed) {
+        // Bypass reverb: connect preReverb directly to master
+        try {
+          this.preReverbNode.disconnect(this.reverbDryGain);
+          this.preReverbNode.disconnect(this.convolver);
+        } catch (e) { /* ignore */ }
+        this.preReverbNode.connect(this.masterGain);
+      } else {
+        // Enable reverb: restore normal routing
+        try {
+          this.preReverbNode.disconnect(this.masterGain);
+        } catch (e) { /* ignore */ }
+        this.preReverbNode.connect(this.reverbDryGain);
+        this.preReverbNode.connect(this.convolver);
+      }
+    }
+    this.lastReverbMix = this.params.reverbMix;
+
+    // Reverb parameters
+    if (this.reverbDryGain && this.reverbWetGain && !reverbBypassed) {
         this.reverbDryGain.gain.setTargetAtTime(1 - this.params.reverbMix, t, ramp);
         this.reverbWetGain.gain.setTargetAtTime(this.params.reverbMix, t, ramp);
     }

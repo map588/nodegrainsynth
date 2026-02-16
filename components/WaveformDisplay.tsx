@@ -127,11 +127,10 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     const amp = height / 2;
     const midY = height / 2;
 
-    // Create gradient (orange to white) - higher opacity for visibility
+    // Create gradient (white fill)
     const gradient = ctx.createLinearGradient(0, 0, width, 0);
-    gradient.addColorStop(0, 'rgba(251, 146, 60, 0.6)');    // Orange (start)
-    gradient.addColorStop(0.5, 'rgba(255, 200, 150, 0.6)'); // Light orange (middle)
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');  // White (end)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');  // White
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)'); // White
 
     // Draw filled waveform (top half - positive)
     ctx.beginPath();
@@ -252,38 +251,32 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         ctx.fillStyle = colors.waveBg;
         ctx.fillRect(0, 0, width, height);
 
-        // Draw Base Waveform (from cache or empty)
+        // Draw Base Waveform (from cache with gradient fill)
         if (offscreenRef.current && data) {
             ctx.drawImage(offscreenRef.current, 0, 0);
 
-            // Draw gradient fill overlay on top of cached waveform
+            // Draw gradient fill overlay
             const amp = height / 2;
             const midY = height / 2;
             const step = Math.max(1, Math.ceil(data.length / width));
 
             // Create gradient (orange to white)
             const gradient = ctx.createLinearGradient(0, 0, width, 0);
-            gradient.addColorStop(0, 'rgba(251, 146, 60, 0.5)');    // Orange (start)
-            gradient.addColorStop(0.5, 'rgba(255, 200, 150, 0.5)'); // Light orange (middle)
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');  // White (end)
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)');  // White
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)'); // White
 
-            // Draw filled waveform
+            // Draw top half
             ctx.beginPath();
             ctx.moveTo(0, midY);
-
             for (let i = 0; i < width; i++) {
                 const sampleIndex = Math.floor((i / width) * data.length);
                 let max = -1.0;
                 for (let j = 0; j < step; j++) {
                     const idx = sampleIndex + j;
-                    if (idx >= 0 && idx < data.length) {
-                        const datum = data[idx];
-                        if (datum > max) max = datum;
-                    }
+                    if (idx >= 0 && idx < data.length && data[idx] > max) max = data[idx];
                 }
                 ctx.lineTo(i, (1 + max) * amp);
             }
-
             ctx.lineTo(width, midY);
             ctx.closePath();
             ctx.fillStyle = gradient;
@@ -292,23 +285,24 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
             // Draw bottom half
             ctx.beginPath();
             ctx.moveTo(0, midY);
-
             for (let i = 0; i < width; i++) {
                 const sampleIndex = Math.floor((i / width) * data.length);
                 let min = 1.0;
                 for (let j = 0; j < step; j++) {
                     const idx = sampleIndex + j;
-                    if (idx >= 0 && idx < data.length) {
-                        const datum = data[idx];
-                        if (datum < min) min = datum;
-                    }
+                    if (idx >= 0 && idx < data.length && data[idx] < min) min = data[idx];
                 }
                 ctx.lineTo(i, (1 + min) * amp);
             }
-
             ctx.lineTo(width, midY);
             ctx.closePath();
             ctx.fill();
+
+            // CRT Scanlines effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+            for (let y = 0; y < height; y += 3) {
+                ctx.fillRect(0, y, width, 1);
+            }
         } else {
             ctx.font = '12px monospace';
             ctx.fillStyle = colors.waveText;
