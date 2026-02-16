@@ -134,6 +134,7 @@ export const App: React.FC = () => {
         if (cancelled) return;
         engineRef.current = engine;
         setEngineType(type);
+        setIsInitialized(true);
         engine.createTestBuffer();
         setAudioData(engine.getAudioData());
       } catch (e) {

@@ -40,6 +40,7 @@ export async function createEngine(
 
     // Fallback to JS engine
     const engine = new AudioEngine(params);
+    await engine.init();
     console.log('[NodeGrain] Using JS audio engine');
     return { engine, type: 'js' };
 }
