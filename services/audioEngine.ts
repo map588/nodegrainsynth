@@ -1,12 +1,9 @@
 import { GranularParams } from '../types';
+import { IAudioEngine, GrainEvent } from './IAudioEngine';
 
-export interface GrainEvent {
-    normPos: number;
-    duration: number;
-    pan: number;
-}
+export type { GrainEvent };
 
-export class AudioEngine {
+export class AudioEngine implements IAudioEngine {
   private ctx: AudioContext | null = null;
   private buffer: AudioBuffer | null = null;
   private isPlaying: boolean = false;

@@ -44,3 +44,11 @@ new_buttons.txt
 
 # Numeric temp files
 [0-9].[0-9]*
+
+# C++ / Emscripten build artifacts
+cpp/build/
+cpp/build-simd/
+
+# WASM build output (generated from C++ source)
+public/wasm/grain_engine.js
+public/wasm/grain_engine.wasm
