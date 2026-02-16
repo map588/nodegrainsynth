@@ -24,17 +24,12 @@ export class AudioEngineWASM implements IAudioEngine {
     private delayFeedbackNode: GainNode | null = null;
     private delayDryGain: GainNode | null = null;
     private delayWetGain: GainNode | null = null;
-    private preDelayNode: GainNode | null = null;
-    private preReverbNode: GainNode | null = null;
     private reverbDryGain: GainNode | null = null;
     private reverbWetGain: GainNode | null = null;
     private convolver: ConvolverNode | null = null;
     private masterGain: GainNode | null = null;
     private analyser: AnalyserNode | null = null;
 
-    // Bypass tracking
-    private lastDelayMix: number = -1;
-    private lastReverbMix: number = -1;
     private lastReverbDecay: number = 0;
 
     // Distortion curve cache (same as JS engine)
@@ -129,9 +124,6 @@ export class AudioEngineWASM implements IAudioEngine {
         this.delayDryGain = this.ctx.createGain();
         this.delayWetGain = this.ctx.createGain();
 
-        this.preDelayNode = this.ctx.createGain();
-        this.preReverbNode = this.ctx.createGain();
-
         this.reverbDryGain = this.ctx.createGain();
         this.reverbWetGain = this.ctx.createGain();
         this.convolver = this.ctx.createConvolver();
@@ -145,25 +137,32 @@ export class AudioEngineWASM implements IAudioEngine {
         this.frequencyDataArray = new Uint8Array(fftSize);
         this.timeDataArray = new Float32Array(fftSize);
 
-        // Wire up signal chain:
-        // WorkletNode → Filter → Distortion → preDelay → Delay → preReverb → Reverb → Master → Analyser → destination
+        // Routing Graph:
+        // WorkletNode → Filter → Distortion → Delay → Reverb → Master → Analyser → destination
         this.workletNode.connect(this.filterNode);
+
+        // 1. Filter → Distortion
         this.filterNode.connect(this.distNode);
-        this.distNode.connect(this.preDelayNode);
 
-        // Delay section
-        this.preDelayNode.connect(this.delayDryGain);
-        this.preDelayNode.connect(this.delayNode);
+        // 2. Distortion → Delay Section
+        this.distNode.connect(this.delayDryGain);
+        this.distNode.connect(this.delayNode);
+
         this.delayNode.connect(this.delayFeedbackNode);
-        this.delayFeedbackNode.connect(this.delayNode);
+        this.delayFeedbackNode.connect(this.delayNode); // Feedback Loop
         this.delayNode.connect(this.delayWetGain);
-        this.delayDryGain.connect(this.preReverbNode);
-        this.delayWetGain.connect(this.preReverbNode);
 
-        // Reverb section
-        this.preReverbNode.connect(this.reverbDryGain);
-        this.preReverbNode.connect(this.convolver);
+        // 3. Delay Output → preReverbNode (sum dry + wet)
+        const preReverbNode = this.ctx.createGain();
+        this.delayDryGain.connect(preReverbNode);
+        this.delayWetGain.connect(preReverbNode);
+
+        // 4. Reverb Section
+        preReverbNode.connect(this.reverbDryGain);
+        preReverbNode.connect(this.convolver);
         this.convolver.connect(this.reverbWetGain);
+
+        // 5. To Master
         this.reverbDryGain.connect(this.masterGain);
         this.reverbWetGain.connect(this.masterGain);
 
@@ -311,56 +310,16 @@ export class AudioEngineWASM implements IAudioEngine {
             this.distNode.curve = this.makeDistortionCurve(newParams.distAmount);
         }
 
-        // Delay bypass logic (same as JS engine)
-        const delayBypassed = newParams.delayMix < 0.001;
-        const wasDelayBypassed = this.lastDelayMix < 0.001;
-
-        if (delayBypassed !== wasDelayBypassed && this.preDelayNode && this.preReverbNode) {
-            if (delayBypassed) {
-                try {
-                    this.preDelayNode.disconnect(this.delayDryGain!);
-                    this.preDelayNode.disconnect(this.delayNode!);
-                } catch (e) { /* ignore */ }
-                this.preDelayNode.connect(this.preReverbNode);
-            } else {
-                try {
-                    this.preDelayNode.disconnect(this.preReverbNode);
-                } catch (e) { /* ignore */ }
-                this.preDelayNode.connect(this.delayDryGain!);
-                this.preDelayNode.connect(this.delayNode!);
-            }
-        }
-        this.lastDelayMix = newParams.delayMix;
-
-        if (this.delayNode && this.delayFeedbackNode && this.delayDryGain && this.delayWetGain && !delayBypassed) {
+        // Delay
+        if (this.delayNode && this.delayFeedbackNode && this.delayDryGain && this.delayWetGain) {
             this.delayNode.delayTime.setTargetAtTime(newParams.delayTime, t, ramp);
             this.delayFeedbackNode.gain.setTargetAtTime(newParams.delayFeedback, t, ramp);
             this.delayDryGain.gain.setTargetAtTime(1 - newParams.delayMix, t, ramp);
             this.delayWetGain.gain.setTargetAtTime(newParams.delayMix, t, ramp);
         }
 
-        // Reverb bypass logic
-        const reverbBypassed = newParams.reverbMix < 0.001;
-        const wasReverbBypassed = this.lastReverbMix < 0.001;
-
-        if (reverbBypassed !== wasReverbBypassed && this.preReverbNode && this.masterGain) {
-            if (reverbBypassed) {
-                try {
-                    this.preReverbNode.disconnect(this.reverbDryGain!);
-                    this.preReverbNode.disconnect(this.convolver!);
-                } catch (e) { /* ignore */ }
-                this.preReverbNode.connect(this.masterGain);
-            } else {
-                try {
-                    this.preReverbNode.disconnect(this.masterGain);
-                } catch (e) { /* ignore */ }
-                this.preReverbNode.connect(this.reverbDryGain!);
-                this.preReverbNode.connect(this.convolver!);
-            }
-        }
-        this.lastReverbMix = newParams.reverbMix;
-
-        if (this.reverbDryGain && this.reverbWetGain && !reverbBypassed) {
+        // Reverb
+        if (this.reverbDryGain && this.reverbWetGain) {
             this.reverbDryGain.gain.setTargetAtTime(1 - newParams.reverbMix, t, ramp);
             this.reverbWetGain.gain.setTargetAtTime(newParams.reverbMix, t, ramp);
         }

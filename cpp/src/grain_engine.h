@@ -19,8 +19,8 @@ static constexpr int MAX_GRAIN_EVENTS = 64;
 // Only the subset relevant to the grain engine (Phase 1)
 struct EngineParams {
     // Grain
-    float grainSize = 0.1f;        // seconds (0.01 - 0.5)
-    float density = 0.05f;         // seconds between grains (0.01 - 0.2)
+    float grainSize = 0.3f;        // seconds (0.01 - 0.5)
+    float density = 0.15f;         // seconds between grains (0.005 - 0.5)
     float spread = 0.0f;           // position offset (0 - 2)
     float position = 0.0f;         // normalized playhead (0 - 1)
     float grainReversalChance = 0.0f; // (0 - 1)
