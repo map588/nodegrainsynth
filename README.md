@@ -11,6 +11,7 @@ A free, browser-based granular synthesizer built with React and TypeScript featu
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-cyan)](https://react.dev/)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-C++-blueviolet)](https://webassembly.org/)
 
 [Features](#-features) • [Getting Started](#-getting-started) • [How It Works](#-how-it-works) • [Presets](#-presets) • [Controls](#-controls)
 
@@ -20,7 +21,7 @@ A free, browser-based granular synthesizer built with React and TypeScript featu
 
 ## ✨ Features
 
-- **🎵 Granular Synthesis Engine** - Real-time grain scheduling with lookahead pattern
+- **🎵 Granular Synthesis Engine** - C++/WASM grain engine running in an AudioWorklet with JS fallback
 - **🎛️ Eurorack-Style Interface** - Modular panels with knobs, buttons, and visual feedback
 - **📊 Real-Time Visualization** - Waveform display with animated grain particles
 - **🎚️ XY Pad Mode** - 2D control over position and mapped parameters
@@ -42,6 +43,7 @@ A free, browser-based granular synthesizer built with React and TypeScript featu
 ### Prerequisites
 
 - **Node.js** 18+
+- **Emscripten** 3.1+ (for building the WASM engine from C++ source)
 - A modern web browser (Chrome, Firefox, Edge, Safari)
 
 ### Installation
@@ -54,9 +56,11 @@ cd nodegrainsynth
 # Install dependencies
 npm install
 
-# Run development server
-npm run dev
+# Build WASM engine and run development server
+npm run dev:full
 ```
+
+> **Note:** If you don't have Emscripten installed, you can still run the JS-only engine with `npm run dev`. The app automatically falls back to the JavaScript engine when WASM is unavailable.
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -96,35 +100,26 @@ Granular synthesis breaks audio into tiny fragments called "grains" (typically 1
 
 ### NodeGrain Architecture
 
+The engine uses a **dual-engine design**: a C++/WASM engine for performance (default) with automatic fallback to a pure JavaScript engine.
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Audio Engine                            │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────┐    ┌──────────┐    ┌─────────┐    ┌───────────┐   │
-│  │  Grain  │───→│ Envelope │───→│  Panner │───→│  Filter   │   │
-│  │ Source │    │          │    │         │    │           │   │
-│  └─────────┘    └──────────┘    └─────────┘    └─────┬─────┘   │
-│                                                     │           │
-│                                                     ↓           │
-│                                              ┌─────────────┐    │
-│                                              │ Distortion  │    │
-│                                              └──────┬──────┘    │
-│                                                     │           │
-│                        ┌──────────────────────────┴──────┐     │
-│                        │                                 │     │
-│                   ┌────↓────┐                      ┌───↓───┐  │
-│                   │  Delay  │                      │ Reverb│  │
-│                   └────┬────┘                      └───┬───┘  │
-│                        │                               │      │
-│                        └───────────┬───────────────────┘      │
-│                                    ↓                          │
-│                              ┌──────────┐                    │
-│                              │  Master  │                    │
-│                              └────┬─────┘                    │
-└───────────────────────────────────┼──────────────────────────┘
-                                    ↓
-                            🎧 Your Ears
+┌────────────────────────────────────────────────────────────────────┐
+│                    C++/WASM AudioWorklet                           │
+│  ┌───────────┐  ┌──────────┐  ┌─────────┐  ┌─────┐  ┌────────┐  │
+│  │   Grain   │→ │ Envelope │→ │  Panner │→ │ LFO │→ │  Mix   │  │
+│  │ Scheduler │  │          │  │         │  │     │  │        │  │
+│  └───────────┘  └──────────┘  └─────────┘  └─────┘  └───┬────┘  │
+└──────────────────────────────────────────────────────────┼────────┘
+                                                           ↓
+               ┌───────────────────────────────────────────────────┐
+               │              Web Audio FX Chain                   │
+               │  Filter → Distortion → Delay → Reverb → Master   │
+               └──────────────────────────┬────────────────────────┘
+                                          ↓
+                                  🎧 Your Ears
 ```
+
+The WASM engine runs grain scheduling, envelopes, LFO, mixing, and panning inside an AudioWorklet on the audio thread — zero main-thread jitter. Effects remain as Web Audio nodes for native browser performance.
 
 ### Modulation System
 
@@ -246,16 +241,22 @@ Quick randomization within stylistic constraints:
 ## 🛠️ Development
 
 ```bash
-# Run dev server
+# Run dev server (JS engine only)
 npm run dev
 
-# Type check
-npm run check
+# Build WASM engine + run dev server
+npm run dev:full
 
-# Build
+# Build WASM engine only
+npm run build:wasm
+
+# Build WASM engine with SIMD
+npm run build:wasm:simd
+
+# Build for production (includes WASM)
 npm run build
 
-# Preview build
+# Preview production build
 npm run preview
 ```
 
@@ -263,16 +264,29 @@ npm run preview
 
 ```
 nodegrainsynth/
-├── App.tsx                 # Main UI component
-├── main.tsx                # React entry point
-├── types.ts                # TypeScript types & constants
+├── App.tsx                          # Main UI component
+├── main.tsx                         # React entry point
+├── types.ts                         # TypeScript types & constants
 ├── services/
-│   └── audioEngine.ts      # Web Audio engine
+│   ├── IAudioEngine.ts              # Engine interface (shared contract)
+│   ├── audioEngine.ts               # JS engine (fallback)
+│   ├── audioEngineWASM.ts           # WASM engine bridge
+│   └── engineFactory.ts             # Engine selection + fallback logic
 ├── components/
-│   ├── Knob.tsx            # Rotary knob control
-│   └── WaveformDisplay.tsx # Canvas visualization
-├── public/                 # Static assets
-└── index.html              # HTML entry point
+│   ├── Knob.tsx                     # Rotary knob control
+│   └── WaveformDisplay.tsx          # Canvas visualization
+├── cpp/                             # C++ WASM source
+│   ├── CMakeLists.txt               # Emscripten build config
+│   └── src/
+│       ├── grain_engine.h / .cpp    # Core DSP engine
+│       ├── grain.h                  # Grain struct (fixed pool)
+│       ├── lfo.h                    # LFO waveforms
+│       ├── param_smoother.h         # Parameter smoothing
+│       └── bindings.cpp             # Embind JS interop
+├── public/
+│   └── worklets/
+│       └── grain-processor.js       # AudioWorklet (loads WASM)
+└── index.html                       # HTML entry point
 ```
 
 ---
@@ -286,8 +300,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## 🙏 Acknowledgments
 
 - Built with [React](https://react.dev) + [TypeScript](https://www.typescriptlang.org/)
+- WASM engine compiled with [Emscripten](https://emscripten.org)
 - Powered by [Vite](https://vitejs.dev)
-- Audio via [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
+- Audio via [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) + [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet)
 - Icons by [Lucide](https://lucide.dev)
 
 ---
