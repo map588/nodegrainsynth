@@ -34,6 +34,7 @@ export async function createEngine(
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Unknown error';
             console.warn('[NodeGrain] WASM engine unavailable, falling back to JS:', message);
+            console.info('[NodeGrain] To enable WASM: install Emscripten, then run "npm run dev:full"');
         }
     }
 
