@@ -198,11 +198,14 @@ export class AudioEngine implements IAudioEngine {
     this.isPlaying = true;
     this.nextGrainTime = this.ctx.currentTime;
 
-    // Restore gains that were zeroed on stop()
+    // Restore gains that were zeroed on stop() with a short ramp to avoid clicks
     const t = this.ctx.currentTime;
+    const rampUp = 0.02; // 20ms fade-in
+
     if (this.masterGain) {
       this.masterGain.gain.cancelScheduledValues(t);
-      this.masterGain.gain.setValueAtTime(this.params.volume, t);
+      this.masterGain.gain.setValueAtTime(0, t);
+      this.masterGain.gain.linearRampToValueAtTime(this.params.volume, t + rampUp);
     }
     if (this.delayFeedbackNode) {
       this.delayFeedbackNode.gain.cancelScheduledValues(t);
@@ -222,12 +225,12 @@ export class AudioEngine implements IAudioEngine {
     // Silence the audio graph: fast-ramp master gain to 0 and kill delay feedback
     if (this.ctx) {
       const t = this.ctx.currentTime;
-      const fadeTime = 0.05; // 50ms fade to avoid clicks
+      const fadeOut = 0.03; // 30ms fade-out
 
       if (this.masterGain) {
         this.masterGain.gain.cancelScheduledValues(t);
         this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, t);
-        this.masterGain.gain.linearRampToValueAtTime(0, t + fadeTime);
+        this.masterGain.gain.linearRampToValueAtTime(0, t + fadeOut);
       }
 
       // Kill delay feedback loop so it doesn't ring indefinitely

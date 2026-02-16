@@ -59,6 +59,10 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
   // Animation frame ref
   const rafRef = useRef<number | null>(null);
 
+  // Ref to read params inside rAF without re-creating the animation loop
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   // XY Pad state
   const [xyPadPosition, setXyPadPosition] = useState<{ x: number; y: number } | null>(null);
   const [isXyPadDragging, setIsXyPadDragging] = useState(false);
@@ -205,6 +209,12 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     }
     ctx.stroke();
 
+    // CRT Scanlines effect (cached — drawn once, not per frame)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    for (let y = 0; y < height; y += 3) {
+        ctx.fillRect(0, y, width, 1);
+    }
+
   }, [data, colors]); // Redraw when data or colors change
 
   // Helper: Acquire particle from pool (returns null if pool exhausted)
@@ -251,58 +261,9 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         ctx.fillStyle = colors.waveBg;
         ctx.fillRect(0, 0, width, height);
 
-        // Draw Base Waveform (from cache with gradient fill)
+        // Draw Base Waveform (from offscreen cache — no per-frame sample iteration)
         if (offscreenRef.current && data) {
             ctx.drawImage(offscreenRef.current, 0, 0);
-
-            // Draw gradient fill overlay
-            const amp = height / 2;
-            const midY = height / 2;
-            const step = Math.max(1, Math.ceil(data.length / width));
-
-            // Create gradient (orange to white)
-            const gradient = ctx.createLinearGradient(0, 0, width, 0);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)');  // White
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)'); // White
-
-            // Draw top half
-            ctx.beginPath();
-            ctx.moveTo(0, midY);
-            for (let i = 0; i < width; i++) {
-                const sampleIndex = Math.floor((i / width) * data.length);
-                let max = -1.0;
-                for (let j = 0; j < step; j++) {
-                    const idx = sampleIndex + j;
-                    if (idx >= 0 && idx < data.length && data[idx] > max) max = data[idx];
-                }
-                ctx.lineTo(i, (1 + max) * amp);
-            }
-            ctx.lineTo(width, midY);
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // Draw bottom half
-            ctx.beginPath();
-            ctx.moveTo(0, midY);
-            for (let i = 0; i < width; i++) {
-                const sampleIndex = Math.floor((i / width) * data.length);
-                let min = 1.0;
-                for (let j = 0; j < step; j++) {
-                    const idx = sampleIndex + j;
-                    if (idx >= 0 && idx < data.length && data[idx] < min) min = data[idx];
-                }
-                ctx.lineTo(i, (1 + min) * amp);
-            }
-            ctx.lineTo(width, midY);
-            ctx.closePath();
-            ctx.fill();
-
-            // CRT Scanlines effect
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-            for (let y = 0; y < height; y += 3) {
-                ctx.fillRect(0, y, width, 1);
-            }
         } else {
             ctx.font = '12px monospace';
             ctx.fillStyle = colors.waveText;
@@ -423,9 +384,9 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         ctx.globalCompositeOperation = 'source-over';
 
         // 4. Draw Playhead / Spray Target
-        const x = params.position * width;
+        const x = paramsRef.current.position * width;
         // Match visual spray zone to actual grain spread range (increased sensitivity)
-        const sprayW = params.spread * (width / 2) * 1.0; // Matches audio grain spread
+        const sprayW = paramsRef.current.spread * (width / 2) * 1.0; // Matches audio grain spread
 
         // Spray Zone (Color inversion for visibility on light theme?)
         // Using white with low opacity works on dark, but on white bg it's invisible.
@@ -473,7 +434,7 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [data, params, audioEngine, colors, isFrozen, isDrifting, xyPadMode, onXyPadChange]);
+  }, [data, audioEngine, colors, isFrozen, isDrifting, xyPadMode, onXyPadChange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
       if (xyPadMode && onXyPadChange) {
