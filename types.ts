@@ -79,7 +79,7 @@ export interface GranularParams {
 
 export const DEFAULT_PARAMS: GranularParams = {
   grainSize: 0.3,
-  density: 0.05,
+  density: 0.15,
   spread: 0.2,
   position: 0.2,
   grainReversalChance: 0,
