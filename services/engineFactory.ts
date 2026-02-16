@@ -32,7 +32,8 @@ export async function createEngine(
             console.log('[NodeGrain] Using WASM audio engine');
             return { engine, type: 'wasm' };
         } catch (e) {
-            console.warn('[NodeGrain] WASM engine failed, falling back to JS:', e);
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            console.warn('[NodeGrain] WASM engine unavailable, falling back to JS:', message);
         }
     }
 

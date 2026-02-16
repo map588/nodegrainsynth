@@ -194,6 +194,13 @@ private:
     // Parameters (current, updated from main thread)
     EngineParams params_;
 
+    // Parameter smoothers for continuous params (prevents zipper noise)
+    ParamSmoother pitchSmoother_;
+    ParamSmoother positionSmoother_;
+    ParamSmoother grainSizeSmoother_;
+    ParamSmoother panSmoother_;
+    ParamSmoother volumeSmoother_;
+
     // Freeze / Drift
     bool isFrozen_ = false;
     float frozenPosition_ = 0.0f;

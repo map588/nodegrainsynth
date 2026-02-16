@@ -81,6 +81,9 @@ export class AudioEngineWASM implements IAudioEngine {
 
         // Compile WASM on the main thread (avoids worklet scope restrictions)
         const wasmResponse = await fetch('/wasm/grain_engine.wasm');
+        if (!wasmResponse.ok) {
+            throw new Error(`Failed to fetch WASM module: ${wasmResponse.status}`);
+        }
         const wasmBytes = await wasmResponse.arrayBuffer();
         const compiledModule = await WebAssembly.compile(wasmBytes);
 
@@ -182,6 +185,15 @@ export class AudioEngineWASM implements IAudioEngine {
     async loadSample(file: File): Promise<void> {
         await this.init();
         if (!this.ctx) return;
+
+        // Validate file size (100MB max to prevent memory exhaustion)
+        const MAX_FILE_SIZE = 100 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+            throw new Error('Audio file too large (max 100MB)');
+        }
+        if (file.size === 0) {
+            throw new Error('Audio file is empty');
+        }
 
         const arrayBuffer = await file.arrayBuffer();
         const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
@@ -471,9 +483,13 @@ export class AudioEngineWASM implements IAudioEngine {
             }
         }
 
-        this.mediaRecorder = new MediaRecorder(this.destinationStream, {
-            mimeType: selectedMimeType
-        });
+        // If no preferred MIME type is supported, let the browser choose its default
+        const recorderOptions: MediaRecorderOptions = {};
+        if (selectedMimeType) {
+            recorderOptions.mimeType = selectedMimeType;
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.destinationStream, recorderOptions);
 
         this.mediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) {
@@ -488,26 +504,31 @@ export class AudioEngineWASM implements IAudioEngine {
     async stopRecording(): Promise<Blob | null> {
         if (!this.mediaRecorder || !this.isRecording) return null;
 
-        return new Promise((resolve) => {
-            this.mediaRecorder!.onstop = async () => {
-                let blob: Blob;
-                if (this.recordedChunks[0]?.type.includes('wav')) {
-                    blob = new Blob(this.recordedChunks, { type: 'audio/wav' });
-                } else {
-                    const webmBlob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-                    blob = await this.convertWebMToWav(webmBlob);
-                }
-                resolve(blob);
-            };
+        const recorder = this.mediaRecorder;
 
-            this.mediaRecorder!.stop();
-            this.isRecording = false;
-
-            if (this.destinationStream) {
-                this.destinationStream.getTracks().forEach(track => track.stop());
-                this.destinationStream = null;
-            }
+        // Assign onstop handler before calling stop() to prevent race condition
+        const stopped = new Promise<void>((resolve) => {
+            recorder.onstop = () => resolve();
         });
+
+        recorder.stop();
+        await stopped;
+
+        let blob: Blob;
+        if (this.recordedChunks[0]?.type.includes('wav')) {
+            blob = new Blob(this.recordedChunks, { type: 'audio/wav' });
+        } else {
+            const webmBlob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+            blob = await this.convertWebMToWav(webmBlob);
+        }
+
+        this.isRecording = false;
+        if (this.destinationStream) {
+            this.destinationStream.getTracks().forEach(track => track.stop());
+            this.destinationStream = null;
+        }
+
+        return blob;
     }
 
     isRecordingActive(): boolean {

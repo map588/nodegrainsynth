@@ -137,7 +137,8 @@ export const App: React.FC = () => {
         engine.createTestBuffer();
         setAudioData(engine.getAudioData());
       } catch (e) {
-        console.error('[NodeGrain] Engine init failed:', e);
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        console.error('[NodeGrain] Engine init failed:', message);
       }
     })();
 

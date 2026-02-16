@@ -30,6 +30,19 @@ void GrainEngine::init(float sampleRate) {
     }
 
     grainEventCount_ = 0;
+
+    // Initialize parameter smoothers (10ms smoothing time)
+    pitchSmoother_.init(sampleRate, 10.0f);
+    positionSmoother_.init(sampleRate, 10.0f);
+    grainSizeSmoother_.init(sampleRate, 10.0f);
+    panSmoother_.init(sampleRate, 10.0f);
+    volumeSmoother_.init(sampleRate, 10.0f);
+
+    pitchSmoother_.setImmediate(0.0f);
+    positionSmoother_.setImmediate(0.0f);
+    grainSizeSmoother_.setImmediate(0.1f);
+    panSmoother_.setImmediate(0.0f);
+    volumeSmoother_.setImmediate(0.8f);
 }
 
 float* GrainEngine::allocateSampleBuffer(int lengthInSamples) {
@@ -62,6 +75,13 @@ void GrainEngine::updateParams(const EngineParams& params) {
     params_ = params;
     lfo_.setRate(params.lfoRate);
     lfo_.setShape(static_cast<LfoShape>(params.lfoShape));
+
+    // Update smoother targets for continuous parameters
+    pitchSmoother_.setTarget(params.pitch);
+    positionSmoother_.setTarget(params.position);
+    grainSizeSmoother_.setTarget(params.grainSize);
+    panSmoother_.setTarget(params.pan);
+    volumeSmoother_.setTarget(params.volume);
 }
 
 void GrainEngine::process(float* outputL, float* outputR, int numFrames) {
@@ -76,6 +96,15 @@ void GrainEngine::process(float* outputL, float* outputR, int numFrames) {
 
     // Cache LFO value for this block (LFO rates are < 20Hz, per-block is fine)
     currentLfoValue_ = lfo_.getValue(static_cast<float>(currentTime_));
+
+    // Advance parameter smoothers (once per block is sufficient)
+    for (int i = 0; i < numFrames; ++i) {
+        pitchSmoother_.process();
+        positionSmoother_.process();
+        grainSizeSmoother_.process();
+        panSmoother_.process();
+        volumeSmoother_.process();
+    }
 
     // Update drift if active
     if (isDrifting_ && !isFrozen_) {
@@ -141,12 +170,12 @@ void GrainEngine::spawnGrain() {
 
     Grain& grain = grains_[slot];
 
-    // Get modulated parameters
-    float grainSize = getModulated(params_.grainSize, LFO_GRAIN_SIZE,
+    // Get modulated parameters (using smoothed values for continuous params)
+    float grainSize = getModulated(grainSizeSmoother_.getCurrent(), LFO_GRAIN_SIZE,
                                    ModScales::grainSize, 0.01f, 0.5f);
     float spread = getModulated(params_.spread, LFO_SPREAD,
                                 ModScales::spread, 0.0f, 2.0f);
-    float pitch = getModulated(params_.pitch, LFO_PITCH,
+    float pitch = getModulated(pitchSmoother_.getCurrent(), LFO_PITCH,
                                ModScales::pitch, -24.0f, 24.0f);
     float fmFreq = getModulated(params_.fmFreq, LFO_FM_FREQ,
                                 ModScales::fmFreq, 0.0f, 1000.0f);
@@ -156,14 +185,14 @@ void GrainEngine::spawnGrain() {
                                 ModScales::attack, 0.01f, 0.9f);
     float release = getModulated(params_.release, LFO_RELEASE,
                                  ModScales::release, 0.01f, 0.9f);
-    float panCenter = getModulated(params_.pan, LFO_PAN,
+    float panCenter = getModulated(panSmoother_.getCurrent(), LFO_PAN,
                                    ModScales::pan, -1.0f, 1.0f);
     float panSpread = getModulated(params_.panSpread, LFO_PAN_SPREAD,
                                    ModScales::panSpread, 0.0f, 1.0f);
 
-    // Position: frozen > drift > manual
+    // Position: frozen > drift > manual (use smoothed position for manual)
     float basePosition = isFrozen_ ? frozenPosition_ :
-                         (isDrifting_ ? driftPosition_ : params_.position);
+                         (isDrifting_ ? driftPosition_ : positionSmoother_.getCurrent());
     float position = getModulated(basePosition, LFO_POSITION,
                                   ModScales::position, 0.0f, 1.0f);
 
@@ -290,12 +319,17 @@ float GrainEngine::computeEnvelope(const Grain& grain) const {
 
     // Small fade to prevent clicks (1% of grain)
     constexpr float fadeRatio = 0.01f;
+    constexpr float epsilon = 1e-6f;
 
     if (phase < fadeRatio) {
         // Anti-click fade-in
         return phase / fadeRatio * 0.001f; // Ramp from 0 to minVal
     } else if (phase < attackEnd) {
-        float t = (phase - fadeRatio) / (attackEnd - fadeRatio);
+        float attackDuration = attackEnd - fadeRatio;
+        if (attackDuration < epsilon) {
+            return 0.001f; // Attack too short, skip to minVal
+        }
+        float t = (phase - fadeRatio) / attackDuration;
         if (grain.exponentialEnv) {
             return 0.001f + t * t * (1.0f - 0.001f); // Quadratic approximation of exp
         } else {
@@ -304,6 +338,9 @@ float GrainEngine::computeEnvelope(const Grain& grain) const {
     } else if (phase < releaseStart) {
         return 1.0f; // Sustain
     } else {
+        if (grain.releaseRatio < epsilon) {
+            return 0.0f; // Release too short, snap to zero
+        }
         float t = (phase - releaseStart) / grain.releaseRatio;
         t = std::min(1.0f, t);
         if (grain.exponentialEnv) {

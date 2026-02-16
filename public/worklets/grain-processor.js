@@ -154,8 +154,31 @@ class GrainProcessor extends AudioWorkletProcessor {
             case 'sampleBuffer': {
                 if (!this.engine) break;
                 const data = msg.data; // Float32Array (transferred)
-                const length = msg.length;
-                const channels = msg.channels;
+
+                // Validate input: data must be a Float32Array with matching length
+                if (!(data instanceof Float32Array) || data.length === 0) {
+                    this.port.postMessage({
+                        type: 'error',
+                        message: 'Invalid sample buffer: expected non-empty Float32Array'
+                    });
+                    break;
+                }
+
+                // Use data.length as the authoritative length (ignore msg.length)
+                // to prevent length mismatch attacks
+                const length = data.length;
+                const channels = Math.max(1, Math.min(2, msg.channels || 1));
+
+                // Cap buffer size to prevent excessive memory allocation
+                // 10 minutes of mono audio at 96kHz = ~57.6M samples
+                const MAX_SAMPLES = 96000 * 600;
+                if (length > MAX_SAMPLES) {
+                    this.port.postMessage({
+                        type: 'error',
+                        message: 'Sample buffer too large (max ' + MAX_SAMPLES + ' samples)'
+                    });
+                    break;
+                }
 
                 // Allocate buffer in WASM heap and copy data
                 const ptr = this.engine.allocateSampleBuffer(length);
