@@ -1,26 +1,28 @@
 {
-  "name": "nodegrain",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "build:wasm": "cd cpp && mkdir -p build && cd build && emcmake cmake .. && emmake make -j4 && cp grain_engine.js grain_engine.wasm ../../public/wasm/",
-    "build:wasm:simd": "cd cpp && mkdir -p build-simd && cd build-simd && emcmake cmake .. -DUSE_SIMD=ON && emmake make -j4",
-    "dev": "vite",
-    "dev:full": "npm run build:wasm && vite",
-    "prebuild": "npm run build:wasm",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react-dom": "^19.2.4",
-    "react": "^19.2.4",
-    "lucide-react": "^0.563.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+    "name": "nodegrain",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "build:wasm": "cd cpp && mkdir -p build && cd build && emcmake cmake .. && emmake make -j4 && cp grain_engine.js grain_engine.wasm ../../public/wasm/",
+        "build:wasm:simd": "cd cpp && mkdir -p build-simd && cd build-simd && emcmake cmake .. -DUSE_SIMD=ON && emmake make -j4",
+        "dev": "vite",
+        "dev:full": "npm run build:wasm && vite",
+        "dev:simd": "npm run build:wasm:simd && vite",
+        "prebuild": "npm run build:wasm",
+        "prebuild:simd": "npm run build:wasm:simd",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "react-dom": "^19.2.4",
+        "react": "^19.2.4",
+        "lucide-react": "^0.563.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.14.0",
+        "@vitejs/plugin-react": "^5.0.0",
+        "typescript": "~5.8.2",
+        "vite": "^6.2.0"
+    }
 }
