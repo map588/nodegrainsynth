@@ -4,7 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "build:wasm": "cd cpp && mkdir -p build && cd build && emcmake cmake .. && emmake make -j4 && cp grain_engine.js grain_engine.wasm ../../public/wasm/",
+    "build:wasm:simd": "cd cpp && mkdir -p build-simd && cd build-simd && emcmake cmake .. -DUSE_SIMD=ON && emmake make -j4",
     "dev": "vite",
+    "dev:full": "npm run build:wasm && vite",
+    "prebuild": "npm run build:wasm",
     "build": "vite build",
     "preview": "vite preview"
   },

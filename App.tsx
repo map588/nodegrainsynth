@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, FolderOpen, Volume2, VolumeX, Activity, Dices, X, Network, Sun, Moon, Save, Upload, ChevronDown, Undo, Redo, Snowflake, Wind, Music, HelpCircle, Circle, Coffee, Smartphone, Monitor } from 'lucide-react';
 import { GranularParams, DEFAULT_PARAMS, LfoShape, EnvelopeCurve, ThemeColors, FACTORY_PRESETS, Preset, ScaleType, SCALE_INTERVALS, snapPitchToScale, TextureProfileType, TEXTURE_PROFILES, randomizeTextureProfile } from './types';
-import { AudioEngine } from './services/audioEngine';
+import { IAudioEngine } from './services/IAudioEngine';
+import { createEngine, EngineType } from './services/engineFactory';
 import { BUILTIN_SAMPLES } from './services/builtinSamples';
 import { Knob } from './components/Knob';
 import { WaveformDisplay } from './components/WaveformDisplay';
@@ -121,17 +122,28 @@ export const App: React.FC = () => {
   const colors = THEME_COLORS[theme];
 
   // Engine ref to persist across renders
-  const engineRef = useRef<AudioEngine | null>(null);
+  const engineRef = useRef<IAudioEngine | null>(null);
+  const [engineType, setEngineType] = useState<EngineType>('js');
 
   useEffect(() => {
-    // Initialize engine on mount
-    engineRef.current = new AudioEngine(params);
-    // Create a default buffer so it's playable immediately
-    engineRef.current.createTestBuffer(); 
-    setAudioData(engineRef.current.getAudioData());
-    
+    // Initialize engine on mount (async for WASM support)
+    let cancelled = false;
+    (async () => {
+      try {
+        const { engine, type } = await createEngine(params);
+        if (cancelled) return;
+        engineRef.current = engine;
+        setEngineType(type);
+        engine.createTestBuffer();
+        setAudioData(engine.getAudioData());
+      } catch (e) {
+        console.error('[NodeGrain] Engine init failed:', e);
+      }
+    })();
+
     // Cleanup
     return () => {
+      cancelled = true;
       engineRef.current?.stop();
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);

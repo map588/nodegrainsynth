@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { GranularParams, ThemeColors } from '../types';
-import { AudioEngine } from '../services/audioEngine';
+import { IAudioEngine } from '../services/IAudioEngine';
 
 interface WaveformDisplayProps {
   data: Float32Array | null;
   params: GranularParams;
   onSeek: (normPos: number) => void;
-  audioEngine: AudioEngine | null;
+  audioEngine: IAudioEngine | null;
   colors: ThemeColors;
   isFrozen?: boolean;
   isDrifting?: boolean;
