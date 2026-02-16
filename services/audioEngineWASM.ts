@@ -246,10 +246,41 @@ export class AudioEngineWASM implements IAudioEngine {
 
     start(): void {
         this.workletNode?.port.postMessage({ type: 'start' });
+
+        // Restore gains that were zeroed on stop()
+        if (this.ctx) {
+            const t = this.ctx.currentTime;
+            if (this.masterGain) {
+                this.masterGain.gain.cancelScheduledValues(t);
+                this.masterGain.gain.setValueAtTime(this.params.volume, t);
+            }
+            if (this.delayFeedbackNode) {
+                this.delayFeedbackNode.gain.cancelScheduledValues(t);
+                this.delayFeedbackNode.gain.setValueAtTime(this.params.delayFeedback, t);
+            }
+        }
     }
 
     stop(): void {
         this.workletNode?.port.postMessage({ type: 'stop' });
+
+        // Silence the FX chain: fast-ramp master gain to 0 and kill delay feedback
+        if (this.ctx) {
+            const t = this.ctx.currentTime;
+            const fadeTime = 0.05; // 50ms fade to avoid clicks
+
+            if (this.masterGain) {
+                this.masterGain.gain.cancelScheduledValues(t);
+                this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, t);
+                this.masterGain.gain.linearRampToValueAtTime(0, t + fadeTime);
+            }
+
+            // Kill delay feedback loop so it doesn't ring indefinitely
+            if (this.delayFeedbackNode) {
+                this.delayFeedbackNode.gain.cancelScheduledValues(t);
+                this.delayFeedbackNode.gain.setValueAtTime(0, t);
+            }
+        }
     }
 
     updateParams(newParams: GranularParams): void {
