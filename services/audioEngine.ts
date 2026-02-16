@@ -197,6 +197,18 @@ export class AudioEngine implements IAudioEngine {
     if (this.isPlaying || !this.ctx) return;
     this.isPlaying = true;
     this.nextGrainTime = this.ctx.currentTime;
+
+    // Restore gains that were zeroed on stop()
+    const t = this.ctx.currentTime;
+    if (this.masterGain) {
+      this.masterGain.gain.cancelScheduledValues(t);
+      this.masterGain.gain.setValueAtTime(this.params.volume, t);
+    }
+    if (this.delayFeedbackNode) {
+      this.delayFeedbackNode.gain.cancelScheduledValues(t);
+      this.delayFeedbackNode.gain.setValueAtTime(this.params.delayFeedback, t);
+    }
+
     this.schedule();
   }
 
@@ -205,6 +217,24 @@ export class AudioEngine implements IAudioEngine {
     if (this.schedulerId) {
       window.clearTimeout(this.schedulerId);
       this.schedulerId = null;
+    }
+
+    // Silence the audio graph: fast-ramp master gain to 0 and kill delay feedback
+    if (this.ctx) {
+      const t = this.ctx.currentTime;
+      const fadeTime = 0.05; // 50ms fade to avoid clicks
+
+      if (this.masterGain) {
+        this.masterGain.gain.cancelScheduledValues(t);
+        this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, t);
+        this.masterGain.gain.linearRampToValueAtTime(0, t + fadeTime);
+      }
+
+      // Kill delay feedback loop so it doesn't ring indefinitely
+      if (this.delayFeedbackNode) {
+        this.delayFeedbackNode.gain.cancelScheduledValues(t);
+        this.delayFeedbackNode.gain.setValueAtTime(0, t);
+      }
     }
   }
 
