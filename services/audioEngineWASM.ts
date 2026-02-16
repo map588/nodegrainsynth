@@ -79,6 +79,11 @@ export class AudioEngineWASM implements IAudioEngine {
         if (!wasmResponse.ok) {
             throw new Error(`Failed to fetch WASM module: ${wasmResponse.status}`);
         }
+        // Guard against Vite's SPA fallback returning HTML with 200 status
+        const contentType = wasmResponse.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+            throw new Error('WASM binary not found (received HTML — run "npm run build:wasm" first)');
+        }
         const wasmBytes = await wasmResponse.arrayBuffer();
         const compiledModule = await WebAssembly.compile(wasmBytes);
 
