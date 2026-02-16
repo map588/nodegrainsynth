@@ -122,13 +122,69 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     }
     ctx.stroke();
 
-    // Waveform
+    // Waveform with gradient fill
+    const step = Math.max(1, Math.ceil(data.length / width));
+    const amp = height / 2;
+    const midY = height / 2;
+
+    // Create gradient (orange to white) - higher opacity for visibility
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, 'rgba(251, 146, 60, 0.6)');    // Orange (start)
+    gradient.addColorStop(0.5, 'rgba(255, 200, 150, 0.6)'); // Light orange (middle)
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');  // White (end)
+
+    // Draw filled waveform (top half - positive)
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+
+    for (let i = 0; i < width; i++) {
+        const sampleIndex = Math.floor((i / width) * data.length);
+
+        let max = -1.0;
+        for (let j = 0; j < step; j++) {
+            const idx = sampleIndex + j;
+            if (idx >= 0 && idx < data.length) {
+                const datum = data[idx];
+                if (datum > max) max = datum;
+            }
+        }
+
+        ctx.lineTo(i, (1 + max) * amp);
+    }
+
+    ctx.lineTo(width, midY);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw filled waveform (bottom half - negative)
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+
+    for (let i = 0; i < width; i++) {
+        const sampleIndex = Math.floor((i / width) * data.length);
+
+        let min = 1.0;
+        for (let j = 0; j < step; j++) {
+            const idx = sampleIndex + j;
+            if (idx >= 0 && idx < data.length) {
+                const datum = data[idx];
+                if (datum < min) min = datum;
+            }
+        }
+
+        ctx.lineTo(i, (1 + min) * amp);
+    }
+
+    ctx.lineTo(width, midY);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw main waveform line on top
     ctx.beginPath();
     ctx.strokeStyle = colors.waveLine;
     ctx.lineWidth = 1;
-
-    const step = Math.max(1, Math.ceil(data.length / width));
-    const amp = height / 2;
 
     for (let i = 0; i < width; i++) {
         const sampleIndex = Math.floor((i / width) * data.length);
@@ -199,6 +255,60 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
         // Draw Base Waveform (from cache or empty)
         if (offscreenRef.current && data) {
             ctx.drawImage(offscreenRef.current, 0, 0);
+
+            // Draw gradient fill overlay on top of cached waveform
+            const amp = height / 2;
+            const midY = height / 2;
+            const step = Math.max(1, Math.ceil(data.length / width));
+
+            // Create gradient (orange to white)
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            gradient.addColorStop(0, 'rgba(251, 146, 60, 0.5)');    // Orange (start)
+            gradient.addColorStop(0.5, 'rgba(255, 200, 150, 0.5)'); // Light orange (middle)
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');  // White (end)
+
+            // Draw filled waveform
+            ctx.beginPath();
+            ctx.moveTo(0, midY);
+
+            for (let i = 0; i < width; i++) {
+                const sampleIndex = Math.floor((i / width) * data.length);
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const idx = sampleIndex + j;
+                    if (idx >= 0 && idx < data.length) {
+                        const datum = data[idx];
+                        if (datum > max) max = datum;
+                    }
+                }
+                ctx.lineTo(i, (1 + max) * amp);
+            }
+
+            ctx.lineTo(width, midY);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Draw bottom half
+            ctx.beginPath();
+            ctx.moveTo(0, midY);
+
+            for (let i = 0; i < width; i++) {
+                const sampleIndex = Math.floor((i / width) * data.length);
+                let min = 1.0;
+                for (let j = 0; j < step; j++) {
+                    const idx = sampleIndex + j;
+                    if (idx >= 0 && idx < data.length) {
+                        const datum = data[idx];
+                        if (datum < min) min = datum;
+                    }
+                }
+                ctx.lineTo(i, (1 + min) * amp);
+            }
+
+            ctx.lineTo(width, midY);
+            ctx.closePath();
+            ctx.fill();
         } else {
             ctx.font = '12px monospace';
             ctx.fillStyle = colors.waveText;

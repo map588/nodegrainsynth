@@ -60,7 +60,7 @@ const KnobComponent: React.FC<KnobProps> = ({
   }, [min, max, integer, step, onChange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (disabled || isMapping) return;
+    if (disabled) return;
 
     if (isMapping) {
       e.preventDefault();
@@ -81,7 +81,7 @@ const KnobComponent: React.FC<KnobProps> = ({
   }, [disabled, isMapping, onToggleTarget, value, onChange]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (disabled || isMapping) return;
+    if (disabled) return;
 
     if (isMapping) {
       e.preventDefault();

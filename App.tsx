@@ -737,17 +737,17 @@ export const App: React.FC = () => {
     >
       {/* Aurora Borealis Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Base dark gradient */}
+        {/* Base gradient */}
         <div
             className="absolute inset-0"
             style={{
                 background: theme === 'dark'
                     ? 'linear-gradient(180deg, #0a0a0a 0%, #0f1419 50%, #0a0a0a 100%)'
-                    : 'linear-gradient(180deg, #e5e5e5 0%, #d4d4d8 50%, #e5e5e5 100%)',
+                    : 'linear-gradient(180deg, #f5f5f4 0%, #e7e5e4 50%, #f5f5f4 100%)',
             }}
         />
 
-        {/* Aurora layer 1 - Green waves */}
+        {/* Aurora layer 1 - Green (dark) / Warm Peach (light) */}
         <div
             className="absolute w-[200%] h-full"
             style={{
@@ -759,15 +759,15 @@ export const App: React.FC = () => {
                         radial-gradient(ellipse 60% 40% at 70% 30%, rgba(16, 185, 129, 0.12) 0%, transparent 50%)
                     `
                     : `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(34, 197, 94, 0.08) 0%, transparent 50%),
-                        radial-gradient(ellipse 60% 40% at 70% 30%, rgba(16, 185, 129, 0.06) 0%, transparent 50%)
+                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(251, 191, 141, 0.25) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 40% at 70% 30%, rgba(253, 186, 116, 0.2) 0%, transparent 50%)
                     `,
                 filter: 'blur(40px)',
                 animation: 'aurora1 25s ease-in-out infinite',
             }}
         />
 
-        {/* Aurora layer 2 - Cyan/Teal waves */}
+        {/* Aurora layer 2 - Cyan (dark) / Soft Pink (light) */}
         <div
             className="absolute w-[200%] h-full"
             style={{
@@ -779,15 +779,15 @@ export const App: React.FC = () => {
                         radial-gradient(ellipse 50% 35% at 30% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)
                     `
                     : `
-                        radial-gradient(ellipse 70% 45% at 50% 20%, rgba(34, 211, 238, 0.06) 0%, transparent 50%),
-                        radial-gradient(ellipse 50% 35% at 30% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 50%)
+                        radial-gradient(ellipse 70% 45% at 50% 20%, rgba(251, 182, 206, 0.2) 0%, transparent 50%),
+                        radial-gradient(ellipse 50% 35% at 30% 50%, rgba(244, 163, 192, 0.18) 0%, transparent 50%)
                     `,
                 filter: 'blur(50px)',
                 animation: 'aurora2 30s ease-in-out infinite',
             }}
         />
 
-        {/* Aurora layer 3 - Purple/Pink waves */}
+        {/* Aurora layer 3 - Purple (dark) / Soft Lavender (light) */}
         <div
             className="absolute w-[200%] h-full"
             style={{
@@ -799,15 +799,15 @@ export const App: React.FC = () => {
                         radial-gradient(ellipse 60% 30% at 10% 25%, rgba(232, 121, 249, 0.08) 0%, transparent 50%)
                     `
                     : `
-                        radial-gradient(ellipse 90% 40% at 80% 35%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
-                        radial-gradient(ellipse 60% 30% at 10% 25%, rgba(232, 121, 249, 0.04) 0%, transparent 50%)
+                        radial-gradient(ellipse 90% 40% at 80% 35%, rgba(196, 181, 253, 0.18) 0%, transparent 50%),
+                        radial-gradient(ellipse 60% 30% at 10% 25%, rgba(221, 214, 254, 0.15) 0%, transparent 50%)
                     `,
                 filter: 'blur(60px)',
                 animation: 'aurora3 35s ease-in-out infinite',
             }}
         />
 
-        {/* Aurora layer 4 - Subtle orange accent */}
+        {/* Aurora layer 4 - Orange (dark) / Soft Gold (light) */}
         <div
             className="absolute w-[200%] h-full"
             style={{
@@ -815,7 +815,7 @@ export const App: React.FC = () => {
                 left: '-60%',
                 background: theme === 'dark'
                     ? `radial-gradient(ellipse 50% 30% at 40% 60%, rgba(251, 146, 60, 0.08) 0%, transparent 50%)`
-                    : `radial-gradient(ellipse 50% 30% at 40% 60%, rgba(251, 146, 60, 0.04) 0%, transparent 50%)`,
+                    : `radial-gradient(ellipse 50% 30% at 40% 60%, rgba(252, 211, 77, 0.15) 0%, transparent 50%)`,
                 filter: 'blur(70px)',
                 animation: 'aurora4 40s ease-in-out infinite',
             }}
